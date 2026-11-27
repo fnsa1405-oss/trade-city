@@ -5,7 +5,7 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 1. **Analista**: lê os candles do ativo e gera o sinal de compra.
 2. **Guardião de Risco**: define stop loss (2 ATR), stop gain (2x o risco) e o tamanho, ajustado pelo humor do trader.
 3. **Auditor**: confere todas as travas. Só o que ele aprova vira ordem.
-4. **Execução**: envia a ordem para a Alpaca (conta **paper** por padrão).
+4. **Execução**: envia a ordem para a corretora. Por padrão é a **corretora simulada** da própria mesa: preços reais (Coinbase e Yahoo Finance), dinheiro de mentira, sem conta e sem bloqueio de país.
 5. **Placar**: registra vitória ou derrota e atualiza o humor.
 
 > Trade é risco. Nada aqui garante lucro e nada aqui é recomendação de investimento.
@@ -41,20 +41,20 @@ Elenco, capital e parâmetros ficam em `trade_city/config.py`.
 
 **Humor:** perigo (3 derrotas seguidas) opera com 25% do tamanho, alerta (dia negativo) com 50%, normal com 100%, confiante (3 vitórias seguidas) com 125%. O humor nunca mexe nas travas.
 
-**Stops na corretora:** em ações (QQQ, SPY) a compra já vai com stop loss e stop gain anexados (ordem bracket), então a Alpaca protege a posição mesmo com a mesa desligada. Em cripto a Alpaca não aceita stops anexados, então a mesa vigia o preço a cada ciclo. Por isso a Bia precisa da mesa rodando sem parar.
+**Stops na corretora:** toda compra já vai com stop loss e stop gain. Na corretora simulada eles funcionam como uma ordem OCO: a cada ciclo ela confere os candles de 1 hora desde a última verificação e executa o stop ou o alvo que o preço tocou, mesmo que a mesa estivesse desligada naquela hora. Se um candle tocou os dois, conta o stop. Custos simulados: 0,1% de taxa por lado em cripto e 0,05% de derrapagem em tudo.
 
 ## Como usar
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # coloque as chaves da conta PAPER da Alpaca
 
 python -m trade_city traders              # lista o elenco
 python -m trade_city backtest bia --dias 730   # dados públicos, sem conta
 python -m trade_city backtest lena --dias 1100
 python -m trade_city backtest teo --dias 59
-python -m trade_city rodar --loop 60      # mesa rodando, um ciclo por minuto
+python -m trade_city rodar               # um ciclo na corretora simulada
+python -m trade_city rodar --loop 60      # um ciclo por minuto
 python -m trade_city placar               # placar do dia
 python -m trade_city panico               # zera e trava tudo
 python -m trade_city destravar
@@ -98,5 +98,16 @@ Dá para rodar o backtest sem computador e sem conta em corretora, direto no Git
 
 1. Abra a aba **Actions** > **Backtest** > **Run workflow**, escolha o trader e confirme.
 2. Quando terminar, abra a execução: o resultado aparece no resumo (Summary).
+
+### Mesa simulada (30 dias antes de qualquer dinheiro real)
+
+O workflow **Mesa simulada** roda sozinho a cada 30 minutos com os traders aprovados na escola. Para ver como está:
+
+1. Aba **Actions** > **Mesa simulada** > a rodada mais recente.
+2. O resumo (Summary) mostra o que cada trader fez e o placar.
+
+O livro de registros e o placar ficam no branch `mesa-dados` (arquivo `placar.txt`). Para rodar na hora, use **Run workflow**.
+
+Conta real só depois de 30 dias de mesa simulada aprovados e com liberação explícita do dono.
 
 Os candles vêm de fontes públicas: Coinbase para o Bitcoin e Yahoo Finance para QQQ e SPY. O Yahoo só guarda 60 dias de candles de 5 minutos, então o backtest do Teo cobre só esse período.

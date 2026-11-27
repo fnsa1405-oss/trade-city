@@ -58,6 +58,29 @@ def coinbase_bars(symbol: str, timeframe: str, days: int, fetch=_http_json, paus
     return sorted((b for b in bars.values() if b.ts + span <= now), key=lambda b: b.ts)
 
 
+def coinbase_latest(symbol: str, fetch=_http_json) -> float:
+    data = fetch(f"https://api.exchange.coinbase.com/products/{symbol.replace('/', '-')}/ticker")
+    return float(data["price"])
+
+
+def yahoo_latest(symbol: str) -> float:
+    import yfinance as yf
+
+    try:
+        return float(yf.Ticker(symbol).fast_info["last_price"])
+    except Exception:
+        bars = yahoo_bars(symbol, "1h", 5)
+        if not bars:
+            raise
+        return bars[-1].close
+
+
+def latest_price(symbol: str, asset_class: AssetClass) -> float:
+    if asset_class is AssetClass.CRYPTO:
+        return coinbase_latest(symbol)
+    return yahoo_latest(symbol)
+
+
 def yahoo_bars(symbol: str, timeframe: str, days: int) -> list[Bar]:
     import yfinance as yf
 
@@ -74,6 +97,13 @@ def yahoo_bars(symbol: str, timeframe: str, days: int) -> list[Bar]:
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
         bars.append(Bar(when.astimezone(timezone.utc), float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"]), float(row["Volume"])))
+    if interval == "1d" and bars:
+        # o candle diário de hoje só fecha às 16h de Nova York: até lá ele está incompleto
+        from zoneinfo import ZoneInfo
+
+        ny_now = datetime.now(ZoneInfo("America/New_York"))
+        if ny_now.hour < 17:
+            bars = [b for b in bars if b.ts.astimezone(ZoneInfo("America/New_York")).date() < ny_now.date()]
     if interval != "1d" and bars:
         span = timedelta(minutes=int(interval[:-1]) * (60 if interval.endswith("h") else 1))
         now = datetime.now(timezone.utc)
