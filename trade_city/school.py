@@ -141,7 +141,7 @@ def evaluate(
                 if rv.reward_ratio >= 10 and not cand.make().has_exit:
                     continue  # sem alvo e sem regra de saída, a operação só termina no stop
                 risk = replace(base_risk, atr_stop_multiple=rv.atr_stop_multiple, reward_ratio=rv.reward_ratio)
-                student = replace(trader, strategy=cand.make(), timeframe=tf)
+                student = replace(trader, strategy=cand.make(), timeframe=tf, atr_stop_multiple=None, reward_ratio=None)
                 train = run_backtest(student, train_bars, risk)
                 warmup = max(student.strategy.window, risk.atr_period + 2)
                 test_full = run_backtest(replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk)

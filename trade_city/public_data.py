@@ -83,5 +83,9 @@ def yahoo_bars(symbol: str, timeframe: str, days: int) -> list[Bar]:
 
 def public_bars(symbol: str, asset_class: AssetClass, timeframe: str, days: int) -> list[Bar]:
     if asset_class is AssetClass.CRYPTO:
+        if timeframe == "4h":  # a Coinbase não tem 4h: junta candles de 1h
+            from .data import resample
+
+            return resample(coinbase_bars(symbol, "1h", days), 4)
         return coinbase_bars(symbol, timeframe, days)
     return yahoo_bars(symbol, timeframe, days)

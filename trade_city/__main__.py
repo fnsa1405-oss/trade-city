@@ -47,7 +47,8 @@ def _desk(db: str):
     from .broker.alpaca import AlpacaBroker
     from .desk import Desk
 
-    return Desk(default_traders(), AlpacaBroker.from_env(), Ledger(db))
+    approved = [t for t in default_traders() if t.approved]  # só quem passou na escola opera
+    return Desk(approved, AlpacaBroker.from_env(), Ledger(db))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -76,7 +77,8 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.cmd == "traders":
         for t in default_traders():
-            print(f"{t.key:6} {t.name:12} {t.symbol:8} {t.timeframe:5} {t.strategy.name}: {t.strategy.description}")
+            status = "aprovado" if t.approved else "na escola"
+            print(f"{t.key:6} {t.name:12} {t.symbol:8} {t.timeframe:5} [{status}] {t.strategy.name}: {t.strategy.description}")
             print(f"       {t.persona}")
         return
 

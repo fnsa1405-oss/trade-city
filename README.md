@@ -12,15 +12,17 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 
 ## O elenco
 
-| Trader | Ativo | Tempo gráfico | Estratégia |
-| --- | --- | --- | --- |
-| Bia Satoshi (`bia`) | BTC/USD | 1h | Seguidor de tendência: MM20 > MM50 e rompimento da máxima de 20 candles |
-| Edu Éter (`edu`) | ETH/USD | a definir na escola | a definir na escola |
-| Sol Ventura (`sol`) | SOL/USD | a definir na escola | a definir na escola |
-| Rui Xis (`rui`) | XRP/USD | a definir na escola | a definir na escola |
-| Dora Doge (`dora`) | DOGE/USD | a definir na escola | a definir na escola |
-| Teo Chip (`teo`) | QQQ (Nasdaq 100) | 5 min | Rompimento da faixa dos primeiros 30 min, zera antes do fechamento |
-| Dona Lena (`lena`) | SPY (S&P 500) | diário | Retorno à média: IFR(2) < 10 acima da MM200, sai acima da MM5 |
+| Trader | Ativo | Tempo gráfico | Estratégia | Situação |
+| --- | --- | --- | --- | --- |
+| Rui Xis (`rui`) | XRP/USD | 4h | Tendência 10/30, stop 1,5 ATR, alvo 3x | aprovado na escola |
+| Teo Chip (`teo`) | QQQ (Nasdaq 100) | diário | Turtle sistema 1 (20/10), saída na mínima de 10 dias | aprovado na escola |
+| Dona Lena (`lena`) | SPY (S&P 500) | diário | Turtle sistema 1 (20/10), saída na mínima de 10 dias | aprovada na escola |
+| Bia Satoshi (`bia`) | BTC/USD | - | - | na escola |
+| Edu Éter (`edu`) | ETH/USD | - | - | na escola |
+| Sol Ventura (`sol`) | SOL/USD | - | - | na escola |
+| Dora Doge (`dora`) | DOGE/USD | - | - | na escola |
+
+Só os aprovados operam na mesa (`rodar`). Os demais continuam sendo testados pela escola.
 
 Elenco, capital e parâmetros ficam em `trade_city/config.py`.
 

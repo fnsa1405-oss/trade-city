@@ -82,3 +82,13 @@ def test_auditor_kill_switch_and_market():
     assert not auditor.review(_plan(), _ctx(market_open=False)).approved
     assert not auditor.review(_plan(), _ctx(has_open_position=True)).approved
     assert not auditor.review(_plan(), _ctx(buying_power=10)).approved
+
+
+def test_risk_for_applies_school_adjustments():
+    from trade_city.config import default_traders, risk_for
+
+    traders = {t.key: t for t in default_traders()}
+    rui = risk_for(traders["rui"], CFG)
+    assert rui.atr_stop_multiple == 1.5 and rui.reward_ratio == 3.0
+    assert risk_for(traders["bia"], CFG) is CFG
+    assert {k for k, t in traders.items() if t.approved} == {"rui", "teo", "lena"}
