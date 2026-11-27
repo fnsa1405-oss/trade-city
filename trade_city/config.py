@@ -1,10 +1,10 @@
 """Configuração da mesa: travas de risco e o elenco de traders."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import MeanReversion, OpeningRangeBreakout, Strategy, TrendFollower
+from .strategies import Strategy, TrendFollower, TurtleBreakout
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,19 @@ class TraderProfile:
     strategy: Strategy = field(compare=False)
     capital: float = 10_000.0  # capital (USD) alocado ao trader na conta
     data_lookback_days: int = 30
+    approved: bool = False  # só traders aprovados na escola operam na mesa
+    atr_stop_multiple: float | None = None  # ajuste de stop aprovado na escola (None = padrão)
+    reward_ratio: float | None = None  # ajuste de alvo aprovado na escola (None = padrão)
+
+
+def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:
+    """Travas da mesa com o ajuste de stop/alvo que o trader aprovou na escola."""
+    changes = {}
+    if trader.atr_stop_multiple is not None:
+        changes["atr_stop_multiple"] = trader.atr_stop_multiple
+    if trader.reward_ratio is not None:
+        changes["reward_ratio"] = trader.reward_ratio
+    return replace(base, **changes) if changes else base
 
 
 def default_traders() -> list[TraderProfile]:
@@ -48,23 +61,72 @@ def default_traders() -> list[TraderProfile]:
             data_lookback_days=10,
         ),
         TraderProfile(
+            key="edu",
+            name="Edu Éter",
+            persona="Engenheiro da turma: opera Ethereum e confere tudo duas vezes.",
+            symbol="ETH/USD",
+            asset_class=AssetClass.CRYPTO,
+            timeframe="1h",
+            strategy=TrendFollower(fast=20, slow=50, breakout=20),
+            data_lookback_days=10,
+        ),
+        TraderProfile(
+            key="sol",
+            name="Sol Ventura",
+            persona="Rápida e ousada: vive no ritmo da Solana.",
+            symbol="SOL/USD",
+            asset_class=AssetClass.CRYPTO,
+            timeframe="1h",
+            strategy=TrendFollower(fast=20, slow=50, breakout=20),
+            data_lookback_days=10,
+        ),
+        TraderProfile(
+            key="rui",
+            name="Rui Xis",
+            persona="Calmo e paciente: espera o XRP sair do lugar.",
+            symbol="XRP/USD",
+            asset_class=AssetClass.CRYPTO,
+            timeframe="4h",
+            strategy=TrendFollower(fast=10, slow=30, breakout=10),
+            data_lookback_days=15,
+            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,51
+            atr_stop_multiple=1.5,
+            reward_ratio=3.0,
+        ),
+        TraderProfile(
+            key="dora",
+            name="Dora Doge",
+            persona="A mais animada do escritório: opera Dogecoin com stop sempre apertado.",
+            symbol="DOGE/USD",
+            asset_class=AssetClass.CRYPTO,
+            timeframe="1h",
+            strategy=TrendFollower(fast=20, slow=50, breakout=20),
+            data_lookback_days=10,
+        ),
+        TraderProfile(
             key="teo",
             name="Teo Chip",
-            persona="Chega antes do pregão e opera o Nasdaq 100 no rompimento da abertura.",
+            persona="Disciplinado como os Turtles: opera o Nasdaq 100 no rompimento de 20 dias.",
             symbol="QQQ",
             asset_class=AssetClass.EQUITY,
-            timeframe="5min",
-            strategy=OpeningRangeBreakout(range_minutes=30),
-            data_lookback_days=5,
+            timeframe="1d",
+            strategy=TurtleBreakout(entry=20, exit=10),
+            data_lookback_days=60,
+            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,42
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
         ),
         TraderProfile(
             key="lena",
             name="Dona Lena",
-            persona="Paciente: compra o S&P 500 quando todo mundo entra em pânico.",
+            persona="Paciente e experiente: segue o S&P 500 com o sistema 1 dos Turtles.",
             symbol="SPY",
             asset_class=AssetClass.EQUITY,
             timeframe="1d",
-            strategy=MeanReversion(),
-            data_lookback_days=420,
+            strategy=TurtleBreakout(entry=20, exit=10),
+            data_lookback_days=60,
+            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,59
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
         ),
     ]

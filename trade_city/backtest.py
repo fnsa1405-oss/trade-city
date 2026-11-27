@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from .auditor import AuditContext, Auditor
-from .config import RiskConfig, TraderProfile
+from .config import RiskConfig, TraderProfile, risk_for
 from .models import AssetClass, Bar, ClosedTrade, Signal, TradePlan
 from .mood import compute_mood
 from .risk import Guardian
@@ -95,9 +95,9 @@ def run_backtest(
 ) -> BacktestReport:
     """Entradas no preço de abertura do candle seguinte ao sinal. Se stop e alvo cabem no mesmo
     candle, conta o stop (hipótese pessimista)."""
-    risk = risk or RiskConfig()
+    risk = risk_for(trader, risk or RiskConfig())
     if fee_pct is None:
-        fee_pct = 0.0025 if trader.asset_class is AssetClass.CRYPTO else 0.0
+        fee_pct = 0.001 if trader.asset_class is AssetClass.CRYPTO else 0.0  # taxa da Binance por lado
     guardian, auditor = Guardian(risk), Auditor(risk)
     strategy = trader.strategy
     report = BacktestReport(trader.name, trader.symbol, bars[0].ts if bars else None, bars[-1].ts if bars else None, trader.capital)

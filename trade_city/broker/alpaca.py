@@ -23,6 +23,7 @@ def _timeframe(tf: str):
         "5min": TimeFrame(5, TimeFrameUnit.Minute),
         "15min": TimeFrame(15, TimeFrameUnit.Minute),
         "1h": TimeFrame(1, TimeFrameUnit.Hour),
+        "4h": TimeFrame(4, TimeFrameUnit.Hour),
         "1d": TimeFrame(1, TimeFrameUnit.Day),
     }
     if tf not in table:
@@ -171,7 +172,7 @@ class AlpacaBroker(Broker):
         return Fill(order_id, fallback_price, fallback_qty)
 
 
-_TF_SECONDS = {"1min": 60, "5min": 300, "15min": 900, "1h": 3600, "1d": 86400}
+_TF_SECONDS = {"1min": 60, "5min": 300, "15min": 900, "1h": 3600, "4h": 14400, "1d": 86400}
 
 
 def _drop_unclosed(bars: list[Bar], timeframe: str, now: datetime) -> list[Bar]:

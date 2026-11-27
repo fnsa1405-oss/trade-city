@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from .auditor import AuditContext, Auditor
 from .broker import Broker
-from .config import RiskConfig, TraderProfile
+from .config import RiskConfig, TraderProfile, risk_for
 from .ledger import Ledger, OpenTrade
 from .models import AssetClass, Signal
 from .mood import Mood, compute_mood
@@ -31,8 +31,6 @@ class Desk:
         self.broker = broker
         self.ledger = ledger
         self.risk = risk or RiskConfig()
-        self.guardian = Guardian(self.risk)
-        self.auditor = Auditor(self.risk)
         self.clock = clock
 
     # placar ---------------------------------------------------------------
@@ -101,7 +99,8 @@ class Desk:
         # 2. Guardião de Risco
         stats = self.stats(trader)
         mood = self.mood(stats)
-        plan, detail = self.guardian.plan(signal, bars, stats.capital, mood, trader.asset_class)
+        risk = risk_for(trader, self.risk)
+        plan, detail = Guardian(risk).plan(signal, bars, stats.capital, mood, trader.asset_class)
         self.ledger.record_decision(now, trader.key, trader.symbol, "guardião", plan is not None, detail)
         if plan is None:
             return events + [f"[{trader.name}] guardião recusou: {detail}"]
@@ -117,7 +116,7 @@ class Desk:
             kill_switch=self.ledger.kill_switch,
             market_open=self.broker.is_market_open(trader.asset_class),
         )
-        audit = self.auditor.review(plan, ctx)
+        audit = Auditor(risk).review(plan, ctx)
         self.ledger.record_decision(
             now, trader.key, trader.symbol, "auditor", audit.approved, "; ".join(audit.reasons) or "aprovado"
         )

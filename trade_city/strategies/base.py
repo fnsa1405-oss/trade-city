@@ -12,6 +12,7 @@ class Strategy(ABC):
     description: str = ""
     min_bars: int = 1  # candles necessários para decidir
     lookback: int = 0  # janela que a estratégia olha (0 = min_bars)
+    has_exit: bool = False  # True quando a estratégia tem regra própria de saída (should_exit)
 
     @property
     def window(self) -> int:
