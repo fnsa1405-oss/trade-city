@@ -1,0 +1,72 @@
+name: Mesa simulada
+
+# A mesa trabalha sozinha: a cada 30 minutos os traders aprovados na escola
+# (Rui, Teo e Lena) analisam, passam pelo gestor de risco e pelo auditor e operam
+# na corretora simulada, com preços reais e dinheiro de mentira.
+# O livro de registros (trade_city.db) e o placar ficam salvos no branch "mesa-dados".
+# Para ver o placar pelo celular: aba Actions > Mesa simulada > última rodada.
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mesa
+  cancel-in-progress: false
+
+jobs:
+  mesa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Abrir o livro de registros
+        run: |
+          WT="$RUNNER_TEMP/mesa-dados"
+          if git fetch --depth=1 origin mesa-dados; then
+            git worktree add -B mesa-dados "$WT" FETCH_HEAD
+            if [ -f "$WT/trade_city.db" ]; then cp "$WT/trade_city.db" trade_city.db; fi
+          else
+            echo "Primeira rodada: livro novo."
+            git worktree add --orphan -b mesa-dados "$WT"
+          fi
+
+      - name: Rodar a mesa
+        run: |
+          python -m trade_city --db trade_city.db rodar | tee rodada.txt
+          python -m trade_city --db trade_city.db placar > placar.txt
+          {
+            echo "## Rodada da mesa"
+            echo '```'
+            cat rodada.txt
+            echo '```'
+            echo "## Placar"
+            echo '```'
+            cat placar.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Salvar o livro no branch mesa-dados
+        run: |
+          WT="$RUNNER_TEMP/mesa-dados"
+          cp trade_city.db placar.txt "$WT/"
+          cd "$WT"
+          git config user.name "trade-city-mesa"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f trade_city.db placar.txt
+          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+          git commit -q -m "mesa: rodada $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3 4; do
+            git push origin mesa-dados && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

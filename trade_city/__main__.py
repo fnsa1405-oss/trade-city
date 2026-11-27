@@ -43,18 +43,32 @@ def _trader(key: str):
     sys.exit(f"trader desconhecido: {key} (use: {', '.join(t.key for t in default_traders())})")
 
 
-def _desk(db: str):
-    from .broker.alpaca import AlpacaBroker
+def _desk(db: str, corretora: str = "simulada"):
     from .desk import Desk
 
     approved = [t for t in default_traders() if t.approved]  # só quem passou na escola opera
-    return Desk(approved, AlpacaBroker.from_env(), Ledger(db))
+    ledger = Ledger(db)
+    if corretora == "alpaca":
+        from .broker.alpaca import AlpacaBroker
+
+        broker = AlpacaBroker.from_env()
+    else:
+        from .broker.paper import PaperBroker
+
+        broker = PaperBroker(ledger.conn, initial_cash=sum(t.capital for t in approved))
+    return Desk(approved, broker, ledger)
 
 
 def main(argv: list[str] | None = None) -> None:
     _load_env_file()
     parser = argparse.ArgumentParser(prog="trade_city", description="Trade City: mesa de traders de IA")
     parser.add_argument("--db", default="trade_city.db", help="arquivo SQLite do livro de registros")
+    parser.add_argument(
+        "--corretora",
+        choices=["simulada", "alpaca"],
+        default="simulada",
+        help="simulada = corretora própria com preços reais e dinheiro de mentira (padrão)",
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("traders", help="lista os traders e suas estratégias")
@@ -68,7 +82,7 @@ def main(argv: list[str] | None = None) -> None:
     esc.add_argument("trader", nargs="?", default="todos")
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
-    run = sub.add_parser("rodar", help="roda a mesa ligada à Alpaca")
+    run = sub.add_parser("rodar", help="roda a mesa (corretora simulada por padrão)")
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
     sub.add_parser("placar", help="mostra o placar do dia")
     sub.add_parser("panico", help="trava a mesa e zera todas as posições")
@@ -135,7 +149,7 @@ def main(argv: list[str] | None = None) -> None:
         print("mesa destravada")
         return
 
-    desk = _desk(args.db)
+    desk = _desk(args.db, args.corretora)
     if args.cmd == "placar":
         from .scoreboard import render
 
@@ -143,7 +157,7 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "panico":
         print("\n".join(desk.panic()))
     elif args.cmd == "rodar":
-        print(f"mesa rodando em modo {'paper' if desk.broker.paper else 'REAL'}")
+        print(f"mesa rodando em modo {'simulado (dinheiro de mentira)' if desk.broker.paper else 'REAL'}")
         while True:
             for event in desk.run_once():
                 print(event, flush=True)
