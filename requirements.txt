@@ -1,2 +1,3 @@
 alpaca-py>=0.43,<1
 pytest>=8
+yfinance>=0.2.50

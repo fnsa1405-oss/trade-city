@@ -1,7 +1,7 @@
 name: Backtest
 
 # Disparo manual pelo celular: aba Actions > Backtest > Run workflow.
-# Usa as chaves da conta PAPER guardadas em Settings > Secrets and variables > Actions.
+# Baixa candles de fontes públicas (Coinbase e Yahoo Finance): não precisa de conta em corretora.
 on:
   workflow_dispatch:
     inputs:
@@ -21,23 +21,12 @@ permissions:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    env:
-      ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-      ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
-      TRADE_CITY_MODE: paper
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Conferir chaves
-        run: |
-          if [ -z "$ALPACA_API_KEY" ] || [ -z "$ALPACA_SECRET_KEY" ]; then
-            echo "### Faltam as chaves da Alpaca" >> "$GITHUB_STEP_SUMMARY"
-            echo "Cadastre ALPACA_API_KEY e ALPACA_SECRET_KEY em Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
       - name: Rodar backtest
         env:
           TRADER: ${{ inputs.trader }}
