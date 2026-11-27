@@ -1,20 +1,6 @@
 Trade City (paper)
 
-Rui Xis  (XRP/USD, seguidor de tendência)
-  humor: normal
-  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
-  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
-  aprendizes liberados: 0 (1 a cada 100 de lucro)
-  posição: nenhuma
-
-Teo Chip  (QQQ, Turtle 20/10)
-  humor: normal
-  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
-  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
-  aprendizes liberados: 0 (1 a cada 100 de lucro)
-  posição: nenhuma
-
-Dona Lena  (SPY, Turtle 20/10)
+Rui Xis  (XRP/USD, Donchian em conjunto (Zarattini/Pagani/Barbon))
   humor: normal
   hoje: 0/10 vitórias, 0/5 derrotas, +0.00
   capital: 10000.00 (pico 10000.00), lucro realizado +0.00
