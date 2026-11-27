@@ -59,6 +59,17 @@ def _desk(db: str, corretora: str = "simulada"):
     return Desk(approved, broker, ledger)
 
 
+def _history_note(series) -> str:
+    from .intraday import NY
+
+    parts = []
+    for tf, bars in series.items():
+        days = len({b.ts.astimezone(NY).date() for b in bars})
+        span = f"{bars[0].ts:%d/%m/%Y} a {bars[-1].ts:%d/%m/%Y}" if bars else "sem dados"
+        parts.append(f"{tf}: {days} pregões ({span})")
+    return "Histórico de day trade: " + "; ".join(parts) + "\n"
+
+
 def main(argv: list[str] | None = None) -> None:
     _load_env_file()
     parser = argparse.ArgumentParser(prog="trade_city", description="Trade City: mesa de traders de IA")
@@ -82,6 +93,9 @@ def main(argv: list[str] | None = None) -> None:
     esc.add_argument("trader", nargs="?", default="todos")
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
+    esc.add_argument("--dados", default="dados", help="pasta com os candles guardados pelo coletor")
+    col = sub.add_parser("coletar", help="guarda os candles de 5 e 1 min dos traders de day trade")
+    col.add_argument("--dados", default="dados")
     run = sub.add_parser("rodar", help="roda a mesa (corretora simulada por padrão)")
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
     sub.add_parser("placar", help="mostra o placar do dia")
@@ -127,14 +141,20 @@ def main(argv: list[str] | None = None) -> None:
         for trader in traders:
             print(f"escola: {trader.name} ({trader.symbol})...", flush=True)
             try:
+                note = ""
                 if trader.asset_class is AssetClass.CRYPTO:
                     series = timeframes_for(trader, public_bars(trader.symbol, trader.asset_class, "1h", args.dias), "1h")
+                elif trader.day_trade:
+                    from .history import DAY_TIMEFRAMES, intraday_history
+
+                    series = {tf: intraday_history(trader.symbol, tf, args.dados) for tf in DAY_TIMEFRAMES}
+                    note = _history_note(series)
                 else:
                     series = {
                         "1d": public_bars(trader.symbol, trader.asset_class, "1d", max(args.dias, 3650)),
                         "1h": public_bars(trader.symbol, trader.asset_class, "1h", 729),
                     }
-                section = report_markdown(trader, evaluate(trader, series))
+                section = report_markdown(trader, evaluate(trader, series)) + note
             except Exception as exc:  # um ativo com problema não derruba os outros
                 section = f"### {trader.name} ({trader.symbol})\n\nErro ao testar: {exc}\n"
             print(section, flush=True)
@@ -142,6 +162,12 @@ def main(argv: list[str] | None = None) -> None:
         if args.saida:
             with open(args.saida, "w") as fh:
                 fh.write("\n".join(parts))
+        return
+
+    if args.cmd == "coletar":
+        from .history import collect
+
+        collect(sorted({t.symbol for t in default_traders() if t.day_trade}), args.dados)
         return
 
     if args.cmd == "destravar":

@@ -5,7 +5,7 @@ import os
 import time
 from datetime import datetime, timedelta, timezone
 
-from ..models import AssetClass, Bar, TradePlan
+from ..models import Side, AssetClass, Bar, TradePlan
 from .base import Broker, Fill, Position
 
 LIVE_CONFIRMATION = "EU_ACEITO_O_RISCO"
@@ -120,8 +120,8 @@ class AlpacaBroker(Broker):
             req = MarketOrderRequest(
                 symbol=symbol,
                 qty=int(plan.qty),
-                side=OrderSide.BUY,
-                time_in_force=TimeInForce.GTC,
+                side=OrderSide.BUY if plan.side is Side.LONG else OrderSide.SELL,
+                time_in_force=TimeInForce.DAY if plan.side is Side.SHORT else TimeInForce.GTC,
                 order_class=OrderClass.BRACKET,
                 take_profit=TakeProfitRequest(limit_price=round(plan.take_profit, 2)),
                 stop_loss=StopLossRequest(stop_price=round(plan.stop_loss, 2)),

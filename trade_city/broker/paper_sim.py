@@ -17,6 +17,7 @@ class SimBroker(Broker):
         self.positions: dict[str, Position] = {}
         self.market_open = True
         self.exits: dict[str, float] = {}
+        self.sides: dict[str, int] = {}
         self._ids = itertools.count(1)
 
     def get_bars(self, symbol, asset_class, timeframe, lookback_days):
@@ -39,13 +40,15 @@ class SimBroker(Broker):
     def submit_entry(self, plan: TradePlan, asset_class):
         price = plan.entry
         self.cash -= price * plan.qty
+        self.sides[plan.signal.symbol] = plan.side.sign
         self.positions[plan.signal.symbol] = Position(plan.signal.symbol, plan.qty, price)
         return Fill(str(next(self._ids)), price, plan.qty)
 
     def close_position(self, symbol):
         pos = self.positions.pop(symbol)
         price = self.prices.get(symbol, pos.avg_entry_price)
-        self.cash += price * pos.qty
+        sign = self.sides.pop(symbol, 1)
+        self.cash += pos.avg_entry_price * pos.qty + (price - pos.avg_entry_price) * pos.qty * sign
         self.exits[symbol] = price
         return Fill(str(next(self._ids)), price, pos.qty)
 

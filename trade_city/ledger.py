@@ -5,6 +5,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from .models import Side
+
 
 @dataclass(frozen=True)
 class OpenTrade:
@@ -16,6 +18,7 @@ class OpenTrade:
     stop_loss: float
     take_profit: float
     opened_at: datetime
+    side: Side = Side.LONG
 
 
 SCHEMA = """
@@ -62,6 +65,9 @@ class Ledger:
     def __init__(self, path: str = "trade_city.db"):
         self.conn = sqlite3.connect(path)
         self.conn.executescript(SCHEMA)
+        cols = {row[1] for row in self.conn.execute("PRAGMA table_info(trades)")}
+        if "side" not in cols:  # livros antigos: tudo era compra
+            self.conn.execute("ALTER TABLE trades ADD COLUMN side TEXT NOT NULL DEFAULT 'compra'")
         self.conn.commit()
 
     # decisões -----------------------------------------------------------
@@ -92,28 +98,31 @@ class Ledger:
         take_profit: float,
         opened_at: datetime,
         broker_order_id: str | None = None,
+        side: Side = Side.LONG,
     ) -> int:
         cur = self.conn.execute(
-            "INSERT INTO trades (trader, symbol, qty, entry_price, stop_loss, take_profit, opened_at, broker_order_id)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (trader, symbol, qty, entry_price, stop_loss, take_profit, _iso(opened_at), broker_order_id),
+            "INSERT INTO trades (trader, symbol, qty, entry_price, stop_loss, take_profit, opened_at, broker_order_id, side)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (trader, symbol, qty, entry_price, stop_loss, take_profit, _iso(opened_at), broker_order_id, side.value),
         )
         self.conn.commit()
         return int(cur.lastrowid)
 
     def open_trade_for(self, trader: str) -> OpenTrade | None:
         row = self.conn.execute(
-            "SELECT id, trader, symbol, qty, entry_price, stop_loss, take_profit, opened_at"
+            "SELECT id, trader, symbol, qty, entry_price, stop_loss, take_profit, opened_at, side"
             " FROM trades WHERE trader = ? AND closed_at IS NULL ORDER BY id DESC LIMIT 1",
             (trader,),
         ).fetchone()
         if row is None:
             return None
-        return OpenTrade(*row[:7], opened_at=_dt(row[7]))
+        return OpenTrade(*row[:7], opened_at=_dt(row[7]), side=Side(row[8]))
 
     def close_trade(self, trade_id: int, exit_price: float, closed_at: datetime, reason: str) -> float:
-        qty, entry = self.conn.execute("SELECT qty, entry_price FROM trades WHERE id = ?", (trade_id,)).fetchone()
-        pnl = (exit_price - entry) * qty
+        qty, entry, side = self.conn.execute(
+            "SELECT qty, entry_price, side FROM trades WHERE id = ?", (trade_id,)
+        ).fetchone()
+        pnl = (exit_price - entry) * qty * Side(side).sign
         self.conn.execute(
             "UPDATE trades SET closed_at = ?, exit_price = ?, pnl = ?, exit_reason = ? WHERE id = ?",
             (_iso(closed_at), exit_price, pnl, reason, trade_id),

@@ -7,7 +7,9 @@ from datetime import datetime
 
 from .auditor import AuditContext, Auditor
 from .config import RiskConfig, TraderProfile, risk_for
-from .models import AssetClass, Bar, ClosedTrade, Signal, TradePlan
+from zoneinfo import ZoneInfo
+
+from .models import AssetClass, Bar, ClosedTrade, Side, Signal, TradePlan
 from .mood import compute_mood
 from .risk import Guardian
 from .stats import compute_stats, day_start
@@ -86,20 +88,31 @@ class _Position:
     opened_at: datetime
 
 
+NY = ZoneInfo("America/New_York")
+
+# custo por lado. Day trade em ETF líquido (SPY, QQQ...): spread de 1 centavo e
+# corretagem de ~US$0,0035 por ação somam menos de 0,005%; usamos 0,01% por segurança.
+DAY_TRADE_EQUITY_SLIPPAGE = 0.0001
+
+
 def run_backtest(
     trader: TraderProfile,
     bars: Sequence[Bar],
     risk: RiskConfig | None = None,
     fee_pct: float | None = None,
-    slippage_pct: float = 0.0005,
+    slippage_pct: float | None = None,
 ) -> BacktestReport:
     """Entradas no preço de abertura do candle seguinte ao sinal. Se stop e alvo cabem no mesmo
-    candle, conta o stop (hipótese pessimista)."""
+    candle, conta o stop (hipótese pessimista). Day trade nunca dorme posicionado."""
     risk = risk_for(trader, risk or RiskConfig())
+    strategy = trader.strategy
     if fee_pct is None:
         fee_pct = 0.001 if trader.asset_class is AssetClass.CRYPTO else 0.0  # taxa da Binance por lado
+    if slippage_pct is None:
+        day_equity = strategy.day_trade and trader.asset_class is AssetClass.EQUITY
+        slippage_pct = DAY_TRADE_EQUITY_SLIPPAGE if day_equity else 0.0005
     guardian, auditor = Guardian(risk), Auditor(risk)
-    strategy = trader.strategy
+    strategy.prepare(bars)
     report = BacktestReport(trader.name, trader.symbol, bars[0].ts if bars else None, bars[-1].ts if bars else None, trader.capital)
 
     pnls: list[tuple[datetime, float]] = []
@@ -109,9 +122,9 @@ def run_backtest(
 
     def close(pos: _Position, price: float, ts: datetime, reason: str) -> None:
         nonlocal equity, peak
-        qty = pos.plan.qty
-        pnl = (price - pos.entry) * qty - fee_pct * (pos.entry + price) * qty
-        report.trades.append(ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason))
+        qty, side = pos.plan.qty, pos.plan.side
+        pnl = (price - pos.entry) * qty * side.sign - fee_pct * (pos.entry + price) * qty
+        report.trades.append(ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason, side))
         pnls.append((ts, pnl))
         equity += pnl
         peak = max(peak, equity)
@@ -120,34 +133,45 @@ def run_backtest(
     for i in range(len(bars)):
         bar = bars[i]
         if pending is not None:
-            entry = bar.open * (1 + slippage_pct)
-            if pending.stop_loss < entry < pending.take_profit:
+            sign = pending.side.sign
+            entry = bar.open * (1 + sign * slippage_pct)
+            low, high = sorted((pending.stop_loss, pending.take_profit))
+            if low < entry < high:
                 position = _Position(pending, entry, bar.ts)
             pending = None
 
         if position is not None:
             plan = position.plan
-            if bar.low <= plan.stop_loss:
-                close(position, min(bar.open, plan.stop_loss) * (1 - slippage_pct), bar.ts, "stop loss")
+            long = plan.side is Side.LONG
+            sign = plan.side.sign
+            if strategy.day_trade and bar.ts.astimezone(NY).date() != position.opened_at.astimezone(NY).date():
+                # faltou candle no fim do pregão: sai na abertura seguinte, nunca carrega a posição
+                close(position, bar.open * (1 - sign * slippage_pct), bar.ts, "fim do pregão")
                 position = None
-            elif bar.high >= plan.take_profit:
-                close(position, max(bar.open, plan.take_profit), bar.ts, "stop gain")
+            elif (bar.low <= plan.stop_loss) if long else (bar.high >= plan.stop_loss):
+                worst = min(bar.open, plan.stop_loss) if long else max(bar.open, plan.stop_loss)
+                close(position, worst * (1 - sign * slippage_pct), bar.ts, "stop loss")
                 position = None
-            elif strategy.should_exit(bars[max(0, i + 1 - strategy.window) : i + 1]):
-                close(position, bar.close * (1 - slippage_pct), bar.ts, "saída da estratégia")
+            elif (bar.high >= plan.take_profit) if long else (bar.low <= plan.take_profit):
+                best = max(bar.open, plan.take_profit) if long else min(bar.open, plan.take_profit)
+                close(position, best, bar.ts, "stop gain")
                 position = None
-            continue
+            elif strategy.exit_signal(bars[max(0, i + 1 - strategy.window) : i + 1], plan.side):
+                close(position, bar.close * (1 - sign * slippage_pct), bar.ts, "saída da estratégia")
+                position = None
+            if position is not None or not strategy.day_trade:
+                continue  # swing: espera o próximo candle; day trade pode entrar de novo
 
         if i + 1 >= len(bars) or i + 1 < strategy.min_bars:
             continue
         window = bars[max(0, i + 1 - strategy.window) : i + 1]
-        reason = strategy.analyze(window)
-        if reason is None:
+        decision = strategy.decide(window)
+        if decision is None:
             continue
         today = day_start(bar.ts, risk.timezone)
         stats = compute_stats(trader.capital, [p for _, p in pnls], [p for ts, p in pnls if ts >= today])
         mood = compute_mood(stats.recent_outcomes, stats.day_pnl)
-        signal = Signal(trader.key, trader.symbol, bar.close, reason, bar.ts)
+        signal = Signal(trader.key, trader.symbol, bar.close, decision.reason, bar.ts, decision.side, decision.stop)
         plan, _ = guardian.plan(signal, bars[max(0, i - risk.atr_period - 1) : i + 1], stats.capital, mood, trader.asset_class)
         if plan is None:
             report.rejected += 1

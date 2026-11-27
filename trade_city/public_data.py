@@ -18,7 +18,10 @@ COINBASE_URL = "https://api.exchange.coinbase.com/products/{product}/candles"
 COINBASE_GRANULARITY = {"1min": 60, "5min": 300, "15min": 900, "1h": 3600, "1d": 86400}
 COINBASE_MAX_CANDLES = 300
 YAHOO_INTERVAL = {"1min": "1m", "5min": "5m", "15min": "15m", "1h": "1h", "1d": "1d"}
-YAHOO_INTRADAY_MAX_DAYS = {"1m": 7, "5m": 59, "15m": 59, "1h": 729}
+YAHOO_INTRADAY_MAX_DAYS = {"1m": 29, "5m": 59, "15m": 59, "1h": 729}
+YAHOO_1M_CHUNK_DAYS = 7  # o Yahoo entrega no máximo 8 dias de 1 min por pedido
+MASSIVE_URLS = ("https://api.massive.com", "https://api.polygon.io")  # Massive é o novo nome da Polygon.io
+MASSIVE_SPAN = {"1min": (1, "minute"), "5min": (5, "minute"), "15min": (15, "minute"), "1h": (1, "hour"), "1d": (1, "day")}
 
 
 def _http_json(url: str) -> object:
@@ -89,14 +92,26 @@ def yahoo_bars(symbol: str, timeframe: str, days: int) -> list[Bar]:
     if limit is not None and days > limit:
         print(f"aviso: o Yahoo só tem {limit} dias de candles de {timeframe}; usando {limit} dias")
         days = limit
-    start = (datetime.now(timezone.utc) - timedelta(days=days)).date()
-    frame = yf.Ticker(symbol).history(start=start.isoformat(), interval=interval, auto_adjust=True)
-    bars = []
-    for ts, row in frame.iterrows():
-        when = ts.to_pydatetime()
-        if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
-        bars.append(Bar(when.astimezone(timezone.utc), float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"]), float(row["Volume"])))
+    now = datetime.now(timezone.utc)
+    ticker = yf.Ticker(symbol)
+    if interval == "1m":
+        frames, start = [], now - timedelta(days=days)
+        while start < now:
+            end = min(start + timedelta(days=YAHOO_1M_CHUNK_DAYS), now)
+            frames.append(ticker.history(start=start, end=end, interval=interval, auto_adjust=True))
+            start = end
+    else:
+        start = (now - timedelta(days=days)).date()
+        frames = [ticker.history(start=start.isoformat(), interval=interval, auto_adjust=True)]
+    found: dict[datetime, Bar] = {}
+    for frame in frames:
+        for ts, row in frame.iterrows():
+            when = ts.to_pydatetime()
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            when = when.astimezone(timezone.utc)
+            found[when] = Bar(when, float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"]), float(row["Volume"]))
+    bars = [found[k] for k in sorted(found)]
     if interval == "1d" and bars:
         # o candle diário de hoje só fecha às 16h de Nova York: até lá ele está incompleto
         from zoneinfo import ZoneInfo
@@ -109,6 +124,40 @@ def yahoo_bars(symbol: str, timeframe: str, days: int) -> list[Bar]:
         now = datetime.now(timezone.utc)
         bars = [b for b in bars if b.ts + span <= now]
     return bars
+
+
+def parse_massive(rows: list[dict]) -> list[Bar]:
+    return [
+        Bar(datetime.fromtimestamp(r["t"] / 1000, tz=timezone.utc), float(r["o"]), float(r["h"]), float(r["l"]), float(r["c"]), float(r.get("v", 0)))
+        for r in rows
+    ]
+
+
+def massive_bars(symbol: str, timeframe: str, days: int, api_key: str, fetch=_http_json, pause: float = 12.5) -> list[Bar]:
+    """Candles da Massive (antiga Polygon.io). O plano gratuito dá cerca de 2 anos de
+    candles de 1 minuto, com 5 pedidos por minuto (por isso a pausa entre páginas)."""
+    mult, span = MASSIVE_SPAN[timeframe]
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=days)
+    path = f"/v2/aggs/ticker/{urllib.parse.quote(symbol)}/range/{mult}/{span}/{start}/{end}?adjusted=true&sort=asc&limit=50000"
+    last_error: Exception | None = None
+    for base in MASSIVE_URLS:
+        url = f"{base}{path}&apiKey={api_key}"
+        found: dict[datetime, Bar] = {}
+        try:
+            while url:
+                data = fetch(url)
+                for bar in parse_massive(data.get("results") or []):
+                    found[bar.ts] = bar
+                nxt = data.get("next_url")
+                url = f"{nxt}&apiKey={api_key}" if nxt else ""
+                if url and pause:
+                    time.sleep(pause)
+        except Exception as exc:  # tenta o outro endereço
+            last_error = exc
+            continue
+        return [found[k] for k in sorted(found)]
+    raise RuntimeError(f"Massive indisponível: {last_error}")
 
 
 def public_bars(symbol: str, asset_class: AssetClass, timeframe: str, days: int) -> list[Bar]:

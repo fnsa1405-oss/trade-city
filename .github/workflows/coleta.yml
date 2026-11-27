@@ -1,0 +1,55 @@
+name: Coleta de candles
+
+# Todo dia útil, depois do fechamento de Nova York, guarda os candles de 5 e 1 minuto
+# dos ativos de day trade no branch "dados-intraday". O Yahoo só mantém 30 a 60 dias,
+# então é assim que a escola de day trade ganha histórico com o tempo.
+on:
+  schedule:
+    - cron: "20 21 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  coleta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Abrir os dados guardados
+        run: |
+          WT="$RUNNER_TEMP/dados-intraday"
+          if git fetch --depth=1 origin dados-intraday; then
+            git worktree add -B dados-intraday "$WT" FETCH_HEAD
+          else
+            git worktree add --orphan -b dados-intraday "$WT"
+          fi
+          mkdir -p "$WT/dados"
+
+      - name: Coletar
+        run: python -m trade_city coletar --dados "$RUNNER_TEMP/dados-intraday/dados" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Salvar no branch dados-intraday
+        run: |
+          cd "$RUNNER_TEMP/dados-intraday"
+          git config user.name "trade-city-coleta"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dados
+          if git diff --cached --quiet; then echo "nada novo"; exit 0; fi
+          git commit -q -m "coleta: $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do
+            git push origin dados-intraday && exit 0
+            sleep $((i * 5))
+          done
+          exit 1
