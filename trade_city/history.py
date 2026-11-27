@@ -18,6 +18,13 @@ from .intraday import regular_session
 from .models import Bar
 
 DAY_TIMEFRAMES = ("5min", "1min")
+MIN_SESSIONS_BEFORE_MASSIVE = 300  # com mais que isso guardado, não precisa baixar de novo
+
+
+def _sessions(found: dict) -> int:
+    from .intraday import NY
+
+    return len({ts.astimezone(NY).date() for ts in found})
 
 
 def csv_path(folder: str, symbol: str, timeframe: str) -> str:
@@ -40,7 +47,7 @@ def intraday_history(symbol: str, timeframe: str, folder: str = "dados", days: i
         _merge(found, load_csv(path))
         log(f"  {symbol} {timeframe}: {len(found)} candles guardados pelo coletor")
     key = massive_key()
-    if key:
+    if key and _sessions(found) < MIN_SESSIONS_BEFORE_MASSIVE:
         from .public_data import massive_bars
 
         try:
@@ -70,6 +77,14 @@ def collect(symbols: list[str], folder: str = "dados", log=print) -> None:
             if os.path.exists(path):
                 _merge(found, load_csv(path))
             before = len(found)
+            key = massive_key()
+            if key and _sessions(found) < MIN_SESSIONS_BEFORE_MASSIVE:
+                from .public_data import massive_bars
+
+                try:  # primeira vez: busca ~2 anos na Massive (antiga Polygon.io)
+                    _merge(found, regular_session(massive_bars(symbol, tf, 730, key)))
+                except Exception as exc:
+                    log(f"aviso: Massive falhou para {symbol} {tf}: {exc}")
             _merge(found, regular_session(yahoo_bars(symbol, tf, 59)))
             save_csv(path, [found[k] for k in sorted(found)])
             log(f"{symbol} {tf}: {len(found)} candles guardados (+{len(found) - before})")

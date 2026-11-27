@@ -58,3 +58,20 @@ def test_intraday_history_merges_collected_csv(tmp_path, monkeypatch):
     monkeypatch.delenv("POLYGON_API_KEY", raising=False)
     bars = intraday_history("SPY", "5min", str(tmp_path), log=lambda *_: None)
     assert [b.close for b in bars] == [1, 2]
+
+
+def test_massive_retries_rate_limit():
+    import urllib.error
+
+    from trade_city.public_data import massive_bars
+
+    calls = []
+
+    def fetch(url):
+        calls.append(url)
+        if len(calls) == 1:
+            raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+        return {"results": [{"t": 1767225600000, "o": 1, "h": 1, "l": 1, "c": 1, "v": 1}]}
+
+    assert len(massive_bars("SPY", "5min", 5, "K", fetch=fetch, pause=0)) == 1
+    assert len(calls) == 2

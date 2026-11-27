@@ -133,6 +133,20 @@ def parse_massive(rows: list[dict]) -> list[Bar]:
     ]
 
 
+def _with_retry(fetch, url: str, pause: float, attempts: int = 6):
+    """O plano gratuito aceita 5 pedidos por minuto: se passar (HTTP 429), espera e tenta de novo."""
+    import urllib.error
+
+    for attempt in range(attempts):
+        try:
+            return fetch(url)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 or attempt == attempts - 1:
+                raise
+            time.sleep(65 if pause else 0)
+    raise RuntimeError("inalcançável")
+
+
 def massive_bars(symbol: str, timeframe: str, days: int, api_key: str, fetch=_http_json, pause: float = 12.5) -> list[Bar]:
     """Candles da Massive (antiga Polygon.io). O plano gratuito dá cerca de 2 anos de
     candles de 1 minuto, com 5 pedidos por minuto (por isso a pausa entre páginas)."""
@@ -146,7 +160,7 @@ def massive_bars(symbol: str, timeframe: str, days: int, api_key: str, fetch=_ht
         found: dict[datetime, Bar] = {}
         try:
             while url:
-                data = fetch(url)
+                data = _with_retry(fetch, url, pause)
                 for bar in parse_massive(data.get("results") or []):
                     found[bar.ts] = bar
                 nxt = data.get("next_url")
