@@ -97,7 +97,7 @@ def run_backtest(
     candle, conta o stop (hipótese pessimista)."""
     risk = risk or RiskConfig()
     if fee_pct is None:
-        fee_pct = 0.0025 if trader.asset_class is AssetClass.CRYPTO else 0.0
+        fee_pct = 0.001 if trader.asset_class is AssetClass.CRYPTO else 0.0  # taxa da Binance por lado
     guardian, auditor = Guardian(risk), Auditor(risk)
     strategy = trader.strategy
     report = BacktestReport(trader.name, trader.symbol, bars[0].ts if bars else None, bars[-1].ts if bars else None, trader.capital)

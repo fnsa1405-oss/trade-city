@@ -63,6 +63,10 @@ def main(argv: list[str] | None = None) -> None:
     bt.add_argument("--fonte", choices=["publica", "alpaca"], default="publica", help="de onde baixar os candles")
     bt.add_argument("--dias", type=int, default=730)
     bt.add_argument("--salvar", help="salva os candles baixados neste CSV")
+    esc = sub.add_parser("escola", help="testa várias estratégias e tempos gráficos por trader")
+    esc.add_argument("trader", nargs="?", default="todos")
+    esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
+    esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     run = sub.add_parser("rodar", help="roda a mesa ligada à Alpaca")
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
     sub.add_parser("placar", help="mostra o placar do dia")
@@ -95,6 +99,33 @@ def main(argv: list[str] | None = None) -> None:
             if args.salvar:
                 save_csv(args.salvar, bars)
         print(run_backtest(trader, bars, RiskConfig()).summary())
+        return
+
+    if args.cmd == "escola":
+        from .models import AssetClass
+        from .public_data import public_bars
+        from .school import evaluate, report_markdown, timeframes_for
+
+        traders = default_traders() if args.trader == "todos" else [_trader(args.trader)]
+        parts = ["## Escola de traders", "", "Estratégia escolhida no treino (70% iniciais do histórico) e conferida na prova (30% finais).", ""]
+        for trader in traders:
+            print(f"escola: {trader.name} ({trader.symbol})...", flush=True)
+            try:
+                if trader.asset_class is AssetClass.CRYPTO:
+                    series = timeframes_for(trader, public_bars(trader.symbol, trader.asset_class, "1h", args.dias), "1h")
+                else:
+                    series = {
+                        "1d": public_bars(trader.symbol, trader.asset_class, "1d", max(args.dias, 3650)),
+                        "1h": public_bars(trader.symbol, trader.asset_class, "1h", 729),
+                    }
+                section = report_markdown(trader, evaluate(trader, series))
+            except Exception as exc:  # um ativo com problema não derruba os outros
+                section = f"### {trader.name} ({trader.symbol})\n\nErro ao testar: {exc}\n"
+            print(section, flush=True)
+            parts.append(section)
+        if args.saida:
+            with open(args.saida, "w") as fh:
+                fh.write("\n".join(parts))
         return
 
     if args.cmd == "destravar":
