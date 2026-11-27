@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import OpeningRangeDayTrade, Strategy, TrendFollower, TurtleBreakout
+from .strategies import DonchianEnsemble, HeikinAshiTrendPullback, OpeningRangeDayTrade, Strategy, TrendFollower
 
 
 @dataclass(frozen=True)
@@ -88,11 +88,11 @@ def default_traders() -> list[TraderProfile]:
             symbol="XRP/USD",
             asset_class=AssetClass.CRYPTO,
             timeframe="4h",
-            strategy=TrendFollower(fast=10, slow=30, breakout=10),
-            data_lookback_days=15,
-            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,51
-            atr_stop_multiple=1.5,
-            reward_ratio=3.0,
+            strategy=DonchianEnsemble(),
+            data_lookback_days=100,  # 561 candles de 4h para os canais de até 360 candles
+            approved=True,  # escola 27/11/2026 (2ª rodada): Donchian em conjunto, prova com fator de lucro 2,09
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando a maioria dos canais sai
         ),
         TraderProfile(
             key="dora",
@@ -107,29 +107,29 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="teo",
             name="Teo Chip",
-            persona="Disciplinado como os Turtles: opera o Nasdaq 100 no rompimento de 20 dias.",
+            persona="Disciplinado e rápido: faz day trade no Nasdaq 100 lendo 60, 15 e 5 minutos.",
             symbol="QQQ",
             asset_class=AssetClass.EQUITY,
-            timeframe="1d",
-            strategy=TurtleBreakout(entry=20, exit=10),
-            data_lookback_days=60,
-            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,42
+            timeframe="5min",
+            strategy=HeikinAshiTrendPullback(),
+            data_lookback_days=25,
+            approved=True,  # escola de day trade 27/11/2026: prova com fator de lucro 2,78 (só 43 pregões de histórico)
             atr_stop_multiple=2.0,
-            reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
-            day_trade=True,  # 27/11/2026: passa para day trade quando uma estratégia for aprovada
+            reward_ratio=50.0,  # sem alvo: sai quando o Heikin-Ashi de 15 min vira ou no fim do dia
+            day_trade=True,
         ),
         TraderProfile(
             key="lena",
             name="Dona Lena",
-            persona="Paciente e experiente: segue o S&P 500 com o sistema 1 dos Turtles.",
+            persona="Paciente e experiente: faz day trade no S&P 500 e só entra a favor do 60 minutos.",
             symbol="SPY",
             asset_class=AssetClass.EQUITY,
-            timeframe="1d",
-            strategy=TurtleBreakout(entry=20, exit=10),
-            data_lookback_days=60,
-            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,59
+            timeframe="5min",
+            strategy=HeikinAshiTrendPullback(),
+            data_lookback_days=25,
+            approved=True,  # escola de day trade 27/11/2026: prova com fator de lucro 3,06 (só 43 pregões de histórico)
             atr_stop_multiple=2.0,
-            reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
+            reward_ratio=3.0,
             day_trade=True,
         ),
         TraderProfile(

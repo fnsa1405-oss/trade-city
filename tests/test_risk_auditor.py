@@ -88,7 +88,8 @@ def test_risk_for_applies_school_adjustments():
     from trade_city.config import default_traders, risk_for
 
     traders = {t.key: t for t in default_traders()}
-    rui = risk_for(traders["rui"], CFG)
-    assert rui.atr_stop_multiple == 1.5 and rui.reward_ratio == 3.0
+    lena = risk_for(traders["lena"], CFG)
+    assert lena.atr_stop_multiple == 2.0 and lena.reward_ratio == 3.0
+    assert risk_for(traders["rui"], CFG).reward_ratio == 50.0
     assert risk_for(traders["bia"], CFG) is CFG
     assert {k for k, t in traders.items() if t.approved} == {"rui", "teo", "lena"}

@@ -14,9 +14,9 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 
 | Trader | Ativo | Tempo gráfico | Estratégia | Situação |
 | --- | --- | --- | --- | --- |
-| Rui Xis (`rui`) | XRP/USD | 4h | Tendência 10/30, stop 1,5 ATR, alvo 3x | aprovado na escola |
-| Teo Chip (`teo`) | QQQ (Nasdaq 100) | diário | Turtle sistema 1 (20/10), saída na mínima de 10 dias | aprovado na escola |
-| Dona Lena (`lena`) | SPY (S&P 500) | diário | Turtle sistema 1 (20/10), saída na mínima de 10 dias | aprovada na escola |
+| Rui Xis (`rui`) | XRP/USD | 4h | Donchian em conjunto (Zarattini/Pagani/Barbon), stop 2 ATR | aprovado na escola |
+| Teo Chip (`teo`) | QQQ (Nasdaq 100) | day trade: 60/15 min + gatilho 5 min | Heikin-Ashi + MME 9/21, stop no recuo, sai na virada do HA de 15 min | aprovado na escola de day trade |
+| Dona Lena (`lena`) | SPY (S&P 500) | day trade: 60/15 min + gatilho 5 min | Heikin-Ashi + MME 9/21, stop no recuo, alvo 3x | aprovada na escola de day trade |
 | Bia Satoshi (`bia`) | BTC/USD | - | - | na escola |
 | Edu Éter (`edu`) | ETH/USD | - | - | na escola |
 | Sol Ventura (`sol`) | SOL/USD | - | - | na escola |
@@ -24,7 +24,7 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Davi Dow (`davi`) | DIA (Dow Jones) | day trade 5/1 min | - | na escola de day trade |
 | Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade 5/1 min | - | na escola de day trade |
 
-Teo e Lena também passaram para a escola de day trade. Enquanto nenhuma estratégia de day trade for aprovada para eles, seguem na mesa simulada com o Turtle diário que já tinham aprovado.
+Atenção: Teo e Lena foram aprovados no day trade com só 43 pregões de histórico (o que o Yahoo guarda). É pouco. Os 30 dias de mesa simulada são o teste de verdade, e a escola roda de novo quando o histórico crescer.
 
 Só os aprovados operam na mesa (`rodar`). Os demais continuam sendo testados pela escola.
 
@@ -137,7 +137,9 @@ O workflow **Mesa simulada** roda sozinho a cada 30 minutos com os traders aprov
 1. Aba **Actions** > **Mesa simulada** > a rodada mais recente.
 2. O resumo (Summary) mostra o que cada trader fez e o placar.
 
-O livro de registros e o placar ficam no branch `mesa-dados` (arquivo `placar.txt`). Para rodar na hora, use **Run workflow**.
+O livro de registros e o placar ficam no branch `mesa-dados` (arquivo `placar.txt`).
+
+O day trade tem uma mesa própria, **Mesa day trade**: roda durante o pregão de Nova York, olha o mercado a cada minuto e decide a cada candle de 5 minutos fechado. O pregão é dividido em duas rodadas (até 12h45 e até o fechamento), porque um job do GitHub dura no máximo 6 horas. O placar fica no branch `mesa-daytrade`. Para rodar na hora, use **Run workflow**.
 
 Conta real só depois de 30 dias de mesa simulada aprovados e com liberação explícita do dono.
 
