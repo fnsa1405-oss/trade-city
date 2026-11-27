@@ -69,3 +69,12 @@ A conta real só abre com `TRADE_CITY_MODE=live` **e** `TRADE_CITY_LIVE=EU_ACEIT
 ```bash
 python -m pytest -q
 ```
+
+## Pelo celular (GitHub Actions)
+
+Dá para rodar o backtest sem computador, direto no GitHub:
+
+1. Na Alpaca, na conta **Paper**, gere as chaves (API Key e Secret Key).
+2. No GitHub, abra o repositório > **Settings** > **Secrets and variables** > **Actions** > **New repository secret** e cadastre `ALPACA_API_KEY` e `ALPACA_SECRET_KEY`.
+3. Abra a aba **Actions** > **Backtest** > **Run workflow**, escolha o trader e confirme.
+4. Quando terminar, abra a execução: o resultado aparece no resumo (Summary).

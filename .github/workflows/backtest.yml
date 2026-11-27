@@ -1,0 +1,53 @@
+name: Backtest
+
+# Disparo manual pelo celular: aba Actions > Backtest > Run workflow.
+# Usa as chaves da conta PAPER guardadas em Settings > Secrets and variables > Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      trader:
+        description: "Qual trader testar"
+        type: choice
+        options: [todos, bia, teo, lena]
+        default: todos
+      dias:
+        description: "Quantos dias de histórico"
+        type: number
+        default: 730
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    env:
+      ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+      ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+      TRADE_CITY_MODE: paper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Conferir chaves
+        run: |
+          if [ -z "$ALPACA_API_KEY" ] || [ -z "$ALPACA_SECRET_KEY" ]; then
+            echo "### Faltam as chaves da Alpaca" >> "$GITHUB_STEP_SUMMARY"
+            echo "Cadastre ALPACA_API_KEY e ALPACA_SECRET_KEY em Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Rodar backtest
+        env:
+          TRADER: ${{ inputs.trader }}
+          DIAS: ${{ inputs.dias }}
+        run: |
+          if [ "$TRADER" = "todos" ]; then lista="bia teo lena"; else lista="$TRADER"; fi
+          echo "## Backtest do Trade City" >> "$GITHUB_STEP_SUMMARY"
+          for t in $lista; do
+            echo "Testando $t..."
+            out=$(python -m trade_city backtest "$t" --dias "$DIAS" 2>&1) || out="erro ao testar $t: $(echo "$out" | tail -5)"
+            echo "$out"
+            printf '\n```\n%s\n```\n' "$out" >> "$GITHUB_STEP_SUMMARY"
+          done
