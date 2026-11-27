@@ -1,7 +1,7 @@
 name: Mesa simulada
 
-# A mesa trabalha sozinha: a cada 30 minutos os traders aprovados na escola
-# (Rui, Teo e Lena) analisam, passam pelo gestor de risco e pelo auditor e operam
+# A mesa trabalha sozinha: a cada 30 minutos os traders aprovados na escola que não são de day trade
+# (hoje o Rui) analisam, passam pelo gestor de risco e pelo auditor e operam
 # na corretora simulada, com preços reais e dinheiro de mentira.
 # O livro de registros (trade_city.db) e o placar ficam salvos no branch "mesa-dados".
 # Para ver o placar pelo celular: aba Actions > Mesa simulada > última rodada.
@@ -42,8 +42,8 @@ jobs:
 
       - name: Rodar a mesa
         run: |
-          python -m trade_city --db trade_city.db rodar | tee rodada.txt
-          python -m trade_city --db trade_city.db placar > placar.txt
+          python -m trade_city --db trade_city.db --grupo swing rodar | tee rodada.txt
+          python -m trade_city --db trade_city.db --grupo swing placar > placar.txt
           {
             echo "## Rodada da mesa"
             echo '```'

@@ -1,0 +1,86 @@
+name: Mesa day trade
+
+# Day trade simulado no pregão de Nova York (9h30 às 16h), com os traders de day trade
+# aprovados na escola (hoje Teo no QQQ e Lena no SPY). A mesa olha o mercado a cada
+# minuto e decide a cada candle de 5 minutos fechado. Zera tudo antes do fechamento.
+# Como um job do GitHub dura no máximo 6 horas, o pregão é dividido em duas rodadas:
+# até 12h45 e de 12h45 ao fechamento. Os horários abaixo estão em UTC e cobrem o
+# horário de verão e o de inverno de Nova York; rodadas repetidas esperam na fila.
+# Livro e placar ficam no branch "mesa-daytrade".
+on:
+  schedule:
+    - cron: "20 13 * * 1-5"
+    - cron: "20 14 * * 1-5"
+    - cron: "40 16 * * 1-5"
+    - cron: "40 17 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mesa-daytrade
+  cancel-in-progress: false
+
+jobs:
+  mesa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Abrir o livro de registros
+        run: |
+          WT="$RUNNER_TEMP/mesa-daytrade"
+          if git fetch --depth=1 origin mesa-daytrade; then
+            git worktree add -B mesa-daytrade "$WT" FETCH_HEAD
+            if [ -f "$WT/mesa_day.db" ]; then cp "$WT/mesa_day.db" mesa_day.db; fi
+          else
+            echo "Primeira rodada: livro novo."
+            git worktree add --orphan -b mesa-daytrade "$WT"
+          fi
+
+      - name: Operar o pregão
+        run: |
+          AGORA=$(TZ=America/New_York date +%H%M)
+          if [ "$AGORA" -lt 1240 ]; then FIM=12:45; else FIM=16:01; fi
+          echo "rodada até $FIM de Nova York"
+          python -m trade_city --db mesa_day.db --grupo day rodar --loop 60 --desde 09:29 --ate "$FIM" | tee rodada.txt
+
+      - name: Placar
+        if: always()
+        run: |
+          python -m trade_city --db mesa_day.db --grupo day placar > placar.txt
+          {
+            echo "## Rodada de day trade"
+            echo '```'
+            grep -v "^mesa rodando" rodada.txt || echo "sem operações nesta rodada"
+            echo '```'
+            echo "## Placar"
+            echo '```'
+            cat placar.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Salvar no branch mesa-daytrade
+        if: always()
+        run: |
+          WT="$RUNNER_TEMP/mesa-daytrade"
+          [ -f mesa_day.db ] || exit 0
+          cp mesa_day.db placar.txt "$WT/"
+          cd "$WT"
+          git config user.name "trade-city-mesa"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f mesa_day.db placar.txt
+          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+          git commit -q -m "day trade: rodada $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3 4; do
+            git push origin mesa-daytrade && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

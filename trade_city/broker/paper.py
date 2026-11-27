@@ -183,7 +183,9 @@ class PaperBroker(Broker):
         cost = self._cost(asset_class)
         since = datetime.fromisoformat(last_check)
         now = self.clock()
-        bars = self.feed.get_bars(symbol, asset_class, "1h", max(2, (now - since).days + 2))
+        # ações: candles de 1 min (day trade); cripto: 1 h (a Coinbase pagina de 300 em 300)
+        timeframe = "1min" if asset_class is AssetClass.EQUITY else "1h"
+        bars = self.feed.get_bars(symbol, asset_class, timeframe, (now - since).days + 2)
         for bar in bars:
             if bar.ts < since:
                 continue  # candle começou antes da entrada ou já foi conferido

@@ -142,3 +142,34 @@ def test_ledger_short_pnl_and_old_books():
     tid = ledger.open_trade("davi", "SPY", 10, 100.0, 102.0, 96.0, datetime(2026, 3, 2, tzinfo=timezone.utc), side=Side.SHORT)
     assert ledger.open_trade_for("davi").side is Side.SHORT
     assert ledger.close_trade(tid, 97.0, datetime(2026, 3, 2, 1, tzinfo=timezone.utc), "teste") == pytest.approx(30.0)
+
+
+def test_desk_day_trade_flattens_before_close_and_groups():
+    from trade_city.__main__ import _desk
+    from trade_city.broker import SimBroker
+    from trade_city.desk import Desk
+
+    class Clock:
+        def __init__(self, now):
+            self.now = now
+
+        def __call__(self):
+            return self.now
+
+    bars = session_bars(days=6, seed=3)
+    broker = SimBroker()
+    broker.bars["SPY"] = bars
+    clock = Clock(datetime(2026, 3, 9, 15, 56, tzinfo=NY))
+    trader = day_trader(OpeningRangeDayTrade(5))
+    ledger = Ledger(":memory:")
+    desk = Desk([trader], broker, ledger, RiskConfig(), clock=clock)
+    ledger.open_trade("davi", "SPY", 10, 100.0, 98.0, 110.0, clock.now, side=Side.LONG)
+    broker.positions["SPY"] = __import__("trade_city.broker.base", fromlist=["Position"]).Position("SPY", 10, 100.0)
+    broker.prices["SPY"] = 101.0
+    events = desk.run_once()
+    assert any("fim do pregão" in e for e in events), events
+    assert ledger.open_trade_for("davi") is None
+
+    day = {t.key for t in _desk(":memory:", grupo="day").traders}
+    swing = {t.key for t in _desk(":memory:", grupo="swing").traders}
+    assert day == {"teo", "lena"} and swing == {"rui"}

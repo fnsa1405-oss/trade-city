@@ -18,6 +18,16 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+DAY_TRADE_FORCE_FLAT = 15 * 60 + 55  # 15h55 de Nova York
+
+
+def _ny_minutes(ts: datetime) -> int:
+    from .intraday import NY
+
+    local = ts.astimezone(NY)
+    return local.hour * 60 + local.minute
+
+
 class Desk:
     def __init__(
         self,
@@ -158,6 +168,8 @@ class Desk:
         price = self.broker.latest_price(trader.symbol, trader.asset_class)
         sign = trade.side.sign
         reason = None
+        if trader.strategy.day_trade and _ny_minutes(now) >= DAY_TRADE_FORCE_FLAT:
+            reason = "fim do pregão"  # rede de segurança: day trade nunca dorme posicionado
         if trader.asset_class is AssetClass.CRYPTO:
             if (price - trade.stop_loss) * sign <= 0:
                 reason = "stop loss"

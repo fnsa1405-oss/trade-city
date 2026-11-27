@@ -43,10 +43,14 @@ def _trader(key: str):
     sys.exit(f"trader desconhecido: {key} (use: {', '.join(t.key for t in default_traders())})")
 
 
-def _desk(db: str, corretora: str = "simulada"):
+def _desk(db: str, corretora: str = "simulada", grupo: str = "todos"):
     from .desk import Desk
 
     approved = [t for t in default_traders() if t.approved]  # só quem passou na escola opera
+    if grupo == "swing":
+        approved = [t for t in approved if not t.strategy.day_trade]
+    elif grupo == "day":
+        approved = [t for t in approved if t.strategy.day_trade]
     ledger = Ledger(db)
     if corretora == "alpaca":
         from .broker.alpaca import AlpacaBroker
@@ -80,6 +84,12 @@ def main(argv: list[str] | None = None) -> None:
         default="simulada",
         help="simulada = corretora própria com preços reais e dinheiro de mentira (padrão)",
     )
+    parser.add_argument(
+        "--grupo",
+        choices=["todos", "swing", "day"],
+        default="todos",
+        help="swing = cripto e operações de vários dias; day = day trade no pregão de Nova York",
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("traders", help="lista os traders e suas estratégias")
@@ -98,6 +108,8 @@ def main(argv: list[str] | None = None) -> None:
     col.add_argument("--dados", default="dados")
     run = sub.add_parser("rodar", help="roda a mesa (corretora simulada por padrão)")
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
+    run.add_argument("--desde", help="HH:MM de Nova York: espera até esse horário para começar")
+    run.add_argument("--ate", help="HH:MM de Nova York: para o loop nesse horário")
     sub.add_parser("placar", help="mostra o placar do dia")
     sub.add_parser("panico", help="trava a mesa e zera todas as posições")
     sub.add_parser("destravar", help="libera a mesa depois do pânico")
@@ -175,7 +187,7 @@ def main(argv: list[str] | None = None) -> None:
         print("mesa destravada")
         return
 
-    desk = _desk(args.db, args.corretora)
+    desk = _desk(args.db, args.corretora, args.grupo)
     if args.cmd == "placar":
         from .scoreboard import render
 
@@ -183,11 +195,29 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "panico":
         print("\n".join(desk.panic()))
     elif args.cmd == "rodar":
+        from datetime import datetime
+
+        from .intraday import NY
+
+        def ny_minutes() -> int:
+            now = datetime.now(NY)
+            return now.hour * 60 + now.minute
+
+        def hm(text: str) -> int:
+            h, m = text.split(":")
+            return int(h) * 60 + int(m)
+
         print(f"mesa rodando em modo {'simulado (dinheiro de mentira)' if desk.broker.paper else 'REAL'}")
+        if args.ate and ny_minutes() >= hm(args.ate):
+            print("fora do horário desta rodada")
+            return
+        if args.desde:
+            while ny_minutes() < hm(args.desde):
+                time.sleep(20)
         while True:
             for event in desk.run_once():
                 print(event, flush=True)
-            if not args.loop:
+            if not args.loop or (args.ate and ny_minutes() >= hm(args.ate)):
                 break
             time.sleep(args.loop)
 
