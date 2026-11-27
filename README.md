@@ -45,9 +45,9 @@ pip install -r requirements.txt
 cp .env.example .env   # coloque as chaves da conta PAPER da Alpaca
 
 python -m trade_city traders              # lista o elenco
-python -m trade_city backtest bia --dias 730
+python -m trade_city backtest bia --dias 730   # dados públicos, sem conta
 python -m trade_city backtest lena --dias 1100
-python -m trade_city backtest teo --dias 730
+python -m trade_city backtest teo --dias 59
 python -m trade_city rodar --loop 60      # mesa rodando, um ciclo por minuto
 python -m trade_city placar               # placar do dia
 python -m trade_city panico               # zera e trava tudo
@@ -72,9 +72,9 @@ python -m pytest -q
 
 ## Pelo celular (GitHub Actions)
 
-Dá para rodar o backtest sem computador, direto no GitHub:
+Dá para rodar o backtest sem computador e sem conta em corretora, direto no GitHub:
 
-1. Na Alpaca, na conta **Paper**, gere as chaves (API Key e Secret Key).
-2. No GitHub, abra o repositório > **Settings** > **Secrets and variables** > **Actions** > **New repository secret** e cadastre `ALPACA_API_KEY` e `ALPACA_SECRET_KEY`.
-3. Abra a aba **Actions** > **Backtest** > **Run workflow**, escolha o trader e confirme.
-4. Quando terminar, abra a execução: o resultado aparece no resumo (Summary).
+1. Abra a aba **Actions** > **Backtest** > **Run workflow**, escolha o trader e confirme.
+2. Quando terminar, abra a execução: o resultado aparece no resumo (Summary).
+
+Os candles vêm de fontes públicas: Coinbase para o Bitcoin e Yahoo Finance para QQQ e SPY. O Yahoo só guarda 60 dias de candles de 5 minutos, então o backtest do Teo cobre só esse período.

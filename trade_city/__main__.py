@@ -1,7 +1,8 @@
 """Linha de comando do Trade City.
 
   python -m trade_city traders
-  python -m trade_city backtest bia --dias 730          (baixa da Alpaca)
+  python -m trade_city backtest bia --dias 730          (dados públicos, sem conta)
+  python -m trade_city backtest bia --fonte alpaca      (dados da Alpaca)
   python -m trade_city backtest lena --csv spy_diario.csv
   python -m trade_city rodar                            (um ciclo)
   python -m trade_city rodar --loop 60                  (a cada 60 s)
@@ -58,7 +59,8 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("traders", help="lista os traders e suas estratégias")
     bt = sub.add_parser("backtest", help="roda o backtest de um trader")
     bt.add_argument("trader")
-    bt.add_argument("--csv", help="candles em CSV (senão baixa da Alpaca)")
+    bt.add_argument("--csv", help="candles em CSV (senão baixa da internet)")
+    bt.add_argument("--fonte", choices=["publica", "alpaca"], default="publica", help="de onde baixar os candles")
     bt.add_argument("--dias", type=int, default=730)
     bt.add_argument("--salvar", help="salva os candles baixados neste CSV")
     run = sub.add_parser("rodar", help="roda a mesa ligada à Alpaca")
@@ -79,10 +81,17 @@ def main(argv: list[str] | None = None) -> None:
         if args.csv:
             bars = load_csv(args.csv)
         else:
-            from .broker.alpaca import AlpacaBroker
+            print(f"baixando {args.dias} dias de {trader.symbol} ({trader.timeframe}), fonte {args.fonte}...")
+            if args.fonte == "alpaca":
+                from .broker.alpaca import AlpacaBroker
 
-            print(f"baixando {args.dias} dias de {trader.symbol} ({trader.timeframe}) da Alpaca...")
-            bars = AlpacaBroker.from_env().get_bars(trader.symbol, trader.asset_class, trader.timeframe, args.dias)
+                bars = AlpacaBroker.from_env().get_bars(trader.symbol, trader.asset_class, trader.timeframe, args.dias)
+            else:
+                from .public_data import public_bars
+
+                bars = public_bars(trader.symbol, trader.asset_class, trader.timeframe, args.dias)
+            if not bars:
+                sys.exit("nenhum candle baixado")
             if args.salvar:
                 save_csv(args.salvar, bars)
         print(run_backtest(trader, bars, RiskConfig()).summary())
