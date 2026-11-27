@@ -62,7 +62,21 @@ Tudo que a mesa decide fica em `trade_city.db` (SQLite): cada sinal, cada recusa
 
 ## Escola de traders (antes da conta real)
 
-`python -m trade_city escola` (ou a aba **Actions** > **Escola**) testa, para cada trader, 6 estratégias × 3 ajustes de stop/alvo × tempos gráficos (1h, 4h e diário em cripto; 1h e diário em ações). A combinação é escolhida nos 70% iniciais do histórico (treino: fator de lucro ≥ 1,3, queda ≤ 15%, ≥ 30 operações) e só é aprovada se confirmar nos 30% finais, que ela nunca viu (prova: fator de lucro ≥ 1,1, resultado positivo, ≥ 10 operações). O rompimento de abertura do Teo fica fora da escola, porque o Yahoo só tem 60 dias de candles de 5 min.
+`python -m trade_city escola` (ou a aba **Actions** > **Escola**) testa, para cada trader, 12 estratégias × 4 ajustes de stop/alvo × tempos gráficos (1h, 4h e diário em cripto; 1h e diário em ações). A combinação é escolhida nos 70% iniciais do histórico (treino: fator de lucro ≥ 1,3, queda ≤ 15%, ≥ 30 operações) e só é aprovada se confirmar nos 30% finais, que ela nunca viu (prova: fator de lucro ≥ 1,1, resultado positivo, ≥ 10 operações). 
+
+Além das estratégias da casa, a escola testa estratégias que traders conhecidos divulgaram publicamente (`trade_city/strategies/published.py`):
+
+| Estratégia | Autor | Regra (versão só compra) | Fonte |
+| --- | --- | --- | --- |
+| Turtle sistemas 1 e 2 | Richard Dennis | Rompe a máxima de 20 (ou 55) candles, sai na mínima de 10 (ou 20) | [IG](https://www.ig.com/uk/trading-strategies/turtle-trading--what-is-it-and-what-are-the-rules--180904) |
+| RSI(2) | Larry Connors | Acima da MM200, IFR(2) ≤ 5, sai acima da MM5 | [StockCharts](https://chartschool.stockcharts.com/table-of-contents/trading-strategies-and-models/trading-strategies/rsi-2) |
+| Double 7s | Larry Connors | Acima da MM200, menor fechamento de 7, sai no maior de 7 | [The Right Trader](https://therighttrader.com/learn/trading-strategies/double-sevens-strategy) |
+| Holy Grail | Linda Raschke | ADX(14) > 30, recuo até a MME20, rompe a máxima anterior | [The Right Trader](https://therighttrader.com/learn/trading-strategies/holy-grail-setup) |
+| Rompimento de volatilidade | Larry Williams | Fecha acima de abertura + 0,5 × amplitude anterior, sai no candle seguinte | [LuxAlgo](https://www.luxalgo.com/library/concept/volatility-breakout/) |
+
+Adaptações: só compra, entrada na abertura do candle seguinte e stop loss do Guardião sempre ligado, mesmo onde o autor não usava stop (Connors).
+
+O rompimento de abertura do Teo fica fora da escola, porque o Yahoo só tem 60 dias de candles de 5 min.
 
 1. **Backtest** de pelo menos 2 anos: fator de lucro acima de 1,3, queda máxima abaixo de 15% e pelo menos 100 operações. O comando `backtest` já diz se o trader passou.
 2. **Paper trading** por pelo menos 30 dias, com resultados perto do backtest.

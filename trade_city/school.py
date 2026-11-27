@@ -13,7 +13,16 @@ from .backtest import BacktestReport, run_backtest
 from .config import RiskConfig, TraderProfile
 from .data import resample
 from .models import AssetClass, Bar, ClosedTrade
-from .strategies import MeanReversion, Strategy, TrendFollower
+from .strategies import (
+    ConnorsRSI2,
+    DoubleSevens,
+    HolyGrail,
+    MeanReversion,
+    Strategy,
+    TrendFollower,
+    TurtleBreakout,
+    WilliamsBreakout,
+)
 
 
 @dataclass(frozen=True)
@@ -36,12 +45,21 @@ CANDIDATES: list[Candidate] = [
     Candidate("retorno IFR2<10 MM200", lambda: MeanReversion(2, 10, 200, 5)),
     Candidate("retorno IFR2<5 MM100", lambda: MeanReversion(2, 5, 100, 5)),
     Candidate("retorno IFR3<20 MM200", lambda: MeanReversion(3, 20, 200, 5)),
+    # estratégias publicadas por traders conhecidos (fontes nos docstrings)
+    Candidate("Turtle sistema 1 (20/10)", lambda: TurtleBreakout(20, 10)),
+    Candidate("Turtle sistema 2 (55/20)", lambda: TurtleBreakout(55, 20)),
+    Candidate("Connors RSI(2)", lambda: ConnorsRSI2(5)),
+    Candidate("Connors Double 7s", lambda: DoubleSevens()),
+    Candidate("Raschke Holy Grail", lambda: HolyGrail()),
+    Candidate("Williams rompimento k=0.5", lambda: WilliamsBreakout(0.5)),
 ]
 
 RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 2 ATR, alvo 2x", 2.0, 2.0),
     RiskVariant("stop 3 ATR, alvo 2x", 3.0, 2.0),
     RiskVariant("stop 1,5 ATR, alvo 3x", 1.5, 3.0),
+    # alvo bem distante: quem decide a saída é a própria estratégia (Turtle, Double 7s...)
+    RiskVariant("stop 2 ATR, saída da estratégia", 2.0, 50.0),
 ]
 
 
@@ -134,7 +152,8 @@ def pick(results: Sequence[Result], rules: SchoolRules = SchoolRules()) -> tuple
     """A melhor no treino entre as que passaram nele; aprovada se também passar na prova."""
     passing = [r for r in results if r.train_ok(rules)]
     if not passing:
-        best = max(results, key=lambda r: (r.train.profit_factor if r.train.trades else 0), default=None)
+        enough = [r for r in results if len(r.train.trades) >= rules.train_min_trades] or list(results)
+        best = max(enough, key=lambda r: (r.train.profit_factor if r.train.trades else 0), default=None)
         return best, False
     best = max(passing, key=lambda r: (r.train.profit_factor, len(r.train.trades)))
     return best, best.test_ok(rules)
