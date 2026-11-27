@@ -2,7 +2,8 @@ name: Coleta de candles
 
 # Todo dia útil, depois do fechamento de Nova York, guarda os candles de 5 e 1 minuto
 # dos ativos de day trade no branch "dados-intraday". O Yahoo só mantém 30 a 60 dias,
-# então é assim que a escola de day trade ganha histórico com o tempo.
+# então é assim que a escola de day trade ganha histórico com o tempo. Com o segredo
+# MASSIVE_API_KEY, a primeira coleta já busca ~2 anos na Massive (antiga Polygon.io).
 on:
   schedule:
     - cron: "20 21 * * 1-5"
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   coleta:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,6 +39,8 @@ jobs:
           mkdir -p "$WT/dados"
 
       - name: Coletar
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
         run: python -m trade_city coletar --dados "$RUNNER_TEMP/dados-intraday/dados" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Salvar no branch dados-intraday
