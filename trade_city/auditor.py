@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .config import RiskConfig
-from .models import AuditResult, TradePlan
+from .models import AuditResult, Side, TradePlan
 from .mood import Mood
 
 
@@ -35,7 +35,11 @@ class Auditor:
         if ctx.has_open_position:
             reasons.append("já existe posição aberta neste ativo")
 
-        if not (0 < plan.stop_loss < plan.entry < plan.take_profit):
+        if plan.side is Side.LONG:
+            coherent = 0 < plan.stop_loss < plan.entry < plan.take_profit
+        else:
+            coherent = 0 < plan.take_profit < plan.entry < plan.stop_loss
+        if not coherent:
             reasons.append("stop loss e stop gain incoerentes com a entrada")
         elif plan.reward_ratio < cfg.min_reward_ratio - 1e-9:
             reasons.append(f"alvo de {plan.reward_ratio:.2f}x o risco, mínimo {cfg.min_reward_ratio}x")

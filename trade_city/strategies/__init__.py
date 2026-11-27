@@ -1,4 +1,13 @@
 from .base import Strategy
+from .crypto import DonchianEnsemble, DowSwing, HeikinAshiTrend, MondayAsiaOpen, Supertrend
+from .daytrade import (
+    DayTradeStrategy,
+    DowHeikinAshi,
+    DowTheoryDayTrade,
+    HeikinAshiTrendPullback,
+    NoiseAreaMomentum,
+    OpeningRangeDayTrade,
+)
 from .mean_reversion import MeanReversion
 from .opening_range import OpeningRangeBreakout
 from .published import ConnorsRSI2, DoubleSevens, HolyGrail, TurtleBreakout, WilliamsBreakout
@@ -14,4 +23,15 @@ __all__ = [
     "DoubleSevens",
     "HolyGrail",
     "WilliamsBreakout",
+    "DonchianEnsemble",
+    "Supertrend",
+    "HeikinAshiTrend",
+    "DowSwing",
+    "MondayAsiaOpen",
+    "DayTradeStrategy",
+    "OpeningRangeDayTrade",
+    "NoiseAreaMomentum",
+    "HeikinAshiTrendPullback",
+    "DowTheoryDayTrade",
+    "DowHeikinAshi",
 ]

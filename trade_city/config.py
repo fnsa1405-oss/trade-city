@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import Strategy, TrendFollower, TurtleBreakout
+from .strategies import OpeningRangeDayTrade, Strategy, TrendFollower, TurtleBreakout
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,7 @@ class TraderProfile:
     approved: bool = False  # só traders aprovados na escola operam na mesa
     atr_stop_multiple: float | None = None  # ajuste de stop aprovado na escola (None = padrão)
     reward_ratio: float | None = None  # ajuste de alvo aprovado na escola (None = padrão)
+    day_trade: bool = False  # True = a escola testa só day trade (gatilho de 5 ou 1 min)
 
 
 def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:
@@ -115,6 +116,7 @@ def default_traders() -> list[TraderProfile]:
             approved=True,  # escola 27/11/2026: prova com fator de lucro 1,42
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
+            day_trade=True,  # 27/11/2026: passa para day trade quando uma estratégia for aprovada
         ),
         TraderProfile(
             key="lena",
@@ -128,5 +130,28 @@ def default_traders() -> list[TraderProfile]:
             approved=True,  # escola 27/11/2026: prova com fator de lucro 1,59
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
+            day_trade=True,
+        ),
+        TraderProfile(
+            key="davi",
+            name="Davi Dow",
+            persona="Veterano do pregão: faz day trade no Dow Jones (DIA) lendo topos e fundos.",
+            symbol="DIA",
+            asset_class=AssetClass.EQUITY,
+            timeframe="5min",
+            strategy=OpeningRangeDayTrade(5),
+            data_lookback_days=25,
+            day_trade=True,
+        ),
+        TraderProfile(
+            key="ivo",
+            name="Ivo Miúdo",
+            persona="Elétrico: faz day trade nas pequenas empresas americanas (Russell 2000, IWM).",
+            symbol="IWM",
+            asset_class=AssetClass.EQUITY,
+            timeframe="5min",
+            strategy=OpeningRangeDayTrade(5),
+            data_lookback_days=25,
+            day_trade=True,
         ),
     ]

@@ -15,10 +15,20 @@ from .data import resample
 from .models import AssetClass, Bar, ClosedTrade
 from .strategies import (
     ConnorsRSI2,
+    DonchianEnsemble,
     DoubleSevens,
+    DowHeikinAshi,
+    DowSwing,
+    DowTheoryDayTrade,
+    HeikinAshiTrend,
+    HeikinAshiTrendPullback,
     HolyGrail,
     MeanReversion,
+    MondayAsiaOpen,
+    NoiseAreaMomentum,
+    OpeningRangeDayTrade,
     Strategy,
+    Supertrend,
     TrendFollower,
     TurtleBreakout,
     WilliamsBreakout,
@@ -52,6 +62,22 @@ CANDIDATES: list[Candidate] = [
     Candidate("Connors Double 7s", lambda: DoubleSevens()),
     Candidate("Raschke Holy Grail", lambda: HolyGrail()),
     Candidate("Williams rompimento k=0.5", lambda: WilliamsBreakout(0.5)),
+    # estratégias atuais de cripto (pesquisa de 27/11/2026, fontes nos docstrings)
+    Candidate("Donchian em conjunto (Zarattini/Pagani/Barbon)", lambda: DonchianEnsemble()),
+    Candidate("Supertrend 10/3", lambda: Supertrend(10, 3.0)),
+    Candidate("Heikin-Ashi + MME50", lambda: HeikinAshiTrend()),
+    Candidate("Teoria de Dow (topos e fundos)", lambda: DowSwing(3)),
+    Candidate("Abertura da Ásia na segunda (Concretum)", lambda: MondayAsiaOpen()),
+]
+
+# day trade em ações/ETFs: contexto 60 e 15 min, gatilho no candle de 5 ou 1 min
+DAY_CANDIDATES: list[Candidate] = [
+    Candidate("ORB 5 min (Zarattini/Aziz)", lambda: OpeningRangeDayTrade(5)),
+    Candidate("ORB 15 min", lambda: OpeningRangeDayTrade(15)),
+    Candidate("Área de ruído + VWAP (Zarattini/Aziz/Barbon)", lambda: NoiseAreaMomentum(14)),
+    Candidate("Heikin-Ashi + MME 9/21 (60/15/gatilho)", lambda: HeikinAshiTrendPullback()),
+    Candidate("Teoria de Dow (60/15/gatilho)", lambda: DowTheoryDayTrade()),
+    Candidate("Dow 60 min + gatilho Heikin-Ashi", lambda: DowHeikinAshi()),
 ]
 
 RISK_VARIANTS: list[RiskVariant] = [
@@ -60,6 +86,14 @@ RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 1,5 ATR, alvo 3x", 1.5, 3.0),
     # alvo bem distante: quem decide a saída é a própria estratégia (Turtle, Double 7s...)
     RiskVariant("stop 2 ATR, saída da estratégia", 2.0, 50.0),
+]
+
+# no day trade o stop vem do gráfico (fundo/topo do gatilho); o ATR só entra se faltar
+DAY_RISK_VARIANTS: list[RiskVariant] = [
+    RiskVariant("stop do gráfico, alvo 2x", 2.0, 2.0),
+    RiskVariant("stop do gráfico, alvo 3x", 2.0, 3.0),
+    RiskVariant("stop do gráfico, alvo 10x (artigo do ORB)", 2.0, 10.0),
+    RiskVariant("stop do gráfico, saída da estratégia ou fim do dia", 2.0, 50.0),
 ]
 
 
@@ -126,10 +160,14 @@ def evaluate(
     trader: TraderProfile,
     series: dict[str, list[Bar]],
     rules: SchoolRules = SchoolRules(),
-    candidates: Sequence[Candidate] = CANDIDATES,
-    risks: Sequence[RiskVariant] = RISK_VARIANTS,
+    candidates: Sequence[Candidate] | None = None,
+    risks: Sequence[RiskVariant] | None = None,
     base_risk: RiskConfig = RiskConfig(),
 ) -> list[Result]:
+    if candidates is None:
+        candidates = DAY_CANDIDATES if trader.day_trade else CANDIDATES
+    if risks is None:
+        risks = DAY_RISK_VARIANTS if trader.day_trade else RISK_VARIANTS
     results = []
     for tf, bars in series.items():
         if len(bars) < 300:

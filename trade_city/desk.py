@@ -8,7 +8,7 @@ from .auditor import AuditContext, Auditor
 from .broker import Broker
 from .config import RiskConfig, TraderProfile, risk_for
 from .ledger import Ledger, OpenTrade
-from .models import AssetClass, Signal
+from .models import AssetClass, Side, Signal
 from .mood import Mood, compute_mood
 from .risk import Guardian
 from .stats import TraderStats, compute_stats, day_start
@@ -89,10 +89,13 @@ class Desk:
             return []
         self.ledger.set_flag(last_key, bar_id)
         window = bars[-trader.strategy.window :]
-        reason = trader.strategy.analyze(window)
-        if reason is None:
+        trader.strategy.prepare(window)
+        decision = trader.strategy.decide(window)
+        if decision is None:
             return []
-        signal = Signal(trader.key, trader.symbol, self.broker.latest_price(trader.symbol, trader.asset_class), reason, now)
+        reason = decision.reason
+        price = self.broker.latest_price(trader.symbol, trader.asset_class)
+        signal = Signal(trader.key, trader.symbol, price, reason, now, decision.side, decision.stop)
         self.ledger.record_decision(now, trader.key, trader.symbol, "analista", True, reason)
         events = [f"[{trader.name}] sinal: {reason}"]
 
@@ -127,11 +130,12 @@ class Desk:
         fill = self.broker.submit_entry(plan, trader.asset_class)
         qty = fill.qty or plan.qty
         self.ledger.open_trade(
-            trader.key, trader.symbol, qty, fill.price, plan.stop_loss, plan.take_profit, now, fill.order_id
+            trader.key, trader.symbol, qty, fill.price, plan.stop_loss, plan.take_profit, now, fill.order_id, plan.side
         )
-        mode = "paper" if self.broker.paper else "REAL"
+        mode = "simulado" if self.broker.paper else "REAL"
+        verb = "comprou" if plan.side is Side.LONG else "vendeu a descoberto"
         return events + [
-            f"[{trader.name}] comprou {qty:g} {trader.symbol} a {fill.price:.2f} ({mode}), "
+            f"[{trader.name}] {verb} {qty:g} {trader.symbol} a {fill.price:.2f} ({mode}), "
             f"stop {plan.stop_loss:.2f}, alvo {plan.take_profit:.2f}"
         ]
 
@@ -142,19 +146,29 @@ class Desk:
         if position is None:
             # a corretora executou o stop loss ou o stop gain
             price = self.broker.last_exit_price(trader.symbol) or trade.entry_price
-            reason = "stop gain" if price >= trade.take_profit else "stop loss" if price <= trade.stop_loss else "corretora"
+            sign = trade.side.sign
+            if (price - trade.take_profit) * sign >= 0:
+                reason = "stop gain"
+            elif (price - trade.stop_loss) * sign <= 0:
+                reason = "stop loss"
+            else:
+                reason = "corretora"
             return [self._close(trader, trade, price, now, reason)]
 
         price = self.broker.latest_price(trader.symbol, trader.asset_class)
+        sign = trade.side.sign
         reason = None
         if trader.asset_class is AssetClass.CRYPTO:
-            if price <= trade.stop_loss:
+            if (price - trade.stop_loss) * sign <= 0:
                 reason = "stop loss"
-            elif price >= trade.take_profit:
+            elif (price - trade.take_profit) * sign >= 0:
                 reason = "stop gain"
-        if reason is None and bars and trader.strategy.should_exit(bars[-trader.strategy.window :]):
-            if trader.asset_class is AssetClass.CRYPTO or self.broker.is_market_open(trader.asset_class):
-                reason = "saída da estratégia"
+        if reason is None and bars:
+            window = bars[-trader.strategy.window :]
+            trader.strategy.prepare(window)
+            if trader.strategy.exit_signal(window, trade.side):
+                if trader.asset_class is AssetClass.CRYPTO or self.broker.is_market_open(trader.asset_class):
+                    reason = "saída da estratégia"
         if reason is None:
             return []
         fill = self.broker.close_position(trader.symbol)

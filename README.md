@@ -21,6 +21,10 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Edu Éter (`edu`) | ETH/USD | - | - | na escola |
 | Sol Ventura (`sol`) | SOL/USD | - | - | na escola |
 | Dora Doge (`dora`) | DOGE/USD | - | - | na escola |
+| Davi Dow (`davi`) | DIA (Dow Jones) | day trade 5/1 min | - | na escola de day trade |
+| Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade 5/1 min | - | na escola de day trade |
+
+Teo e Lena também passaram para a escola de day trade. Enquanto nenhuma estratégia de day trade for aprovada para eles, seguem na mesa simulada com o Turtle diário que já tinham aprovado.
 
 Só os aprovados operam na mesa (`rodar`). Os demais continuam sendo testados pela escola.
 
@@ -64,7 +68,7 @@ Tudo que a mesa decide fica em `trade_city.db` (SQLite): cada sinal, cada recusa
 
 ## Escola de traders (antes da conta real)
 
-`python -m trade_city escola` (ou a aba **Actions** > **Escola**) testa, para cada trader, 12 estratégias × até 4 ajustes de stop/alvo × tempos gráficos (1h, 4h e diário em cripto; 1h e diário em ações). A combinação é escolhida nos 70% iniciais do histórico (treino: fator de lucro ≥ 1,3, queda ≤ 15%, ≥ 30 operações) e só é aprovada se confirmar nos 30% finais, que ela nunca viu (prova: fator de lucro ≥ 1,1, resultado positivo, ≥ 10 operações). 
+`python -m trade_city escola` (ou a aba **Actions** > **Escola**) testa, para cada trader de cripto, 17 estratégias × até 4 ajustes de stop/alvo × tempos gráficos (1h, 4h e diário). Os traders de day trade testam 6 estratégias × 4 ajustes × gatilho de 5 ou 1 minuto. A combinação é escolhida nos 70% iniciais do histórico (treino: fator de lucro ≥ 1,3, queda ≤ 15%, ≥ 30 operações) e só é aprovada se confirmar nos 30% finais, que ela nunca viu (prova: fator de lucro ≥ 1,1, resultado positivo, ≥ 10 operações). 
 
 Além das estratégias da casa, a escola testa estratégias que traders conhecidos divulgaram publicamente (`trade_city/strategies/published.py`):
 
@@ -78,7 +82,34 @@ Além das estratégias da casa, a escola testa estratégias que traders conhecid
 
 Adaptações: só compra, entrada na abertura do candle seguinte e stop loss do Guardião sempre ligado, mesmo onde o autor não usava stop (Connors).
 
-O rompimento de abertura do Teo fica fora da escola, porque o Yahoo só tem 60 dias de candles de 5 min.
+Estratégias atuais de cripto (pesquisa de 27/11/2026, `trade_city/strategies/crypto.py`):
+
+| Estratégia | Autor | Regra (só compra) | Fonte |
+| --- | --- | --- | --- |
+| Donchian em conjunto | Zarattini, Pagani e Barbon (2025) | Canais de 5 a 360 candles votam; compra com a maioria, cada canal sai no meio do canal | [Concretum](https://concretumgroup.com/catching-crypto-trends-a-tactical-approach-for-bitcoin-and-altcoins/) |
+| Supertrend 10/3 | Olivier Seban | Compra na virada do Supertrend para alta, sai na virada para baixa | [Investopedia](https://www.investopedia.com/supertrend-indicator-7976167) |
+| Heikin-Ashi + MME50 | Dan Valcu | Acima da MME50, compra quando o HA vira verde após 2 vermelhos, sai no 1º vermelho | [Investopedia](https://www.investopedia.com/trading/heikin-ashi-better-candlestick/) |
+| Teoria de Dow | Charles Dow | Fundo mais alto e rompimento do último topo; sai na perda do último fundo | [Investopedia](https://www.investopedia.com/terms/d/dowtheory.asp) |
+| Abertura da Ásia na segunda | Concretum Research (2025) | Compra domingo 19h de Nova York acima da média de 20 dias, vende 24h depois | [Concretum](https://concretumgroup.com/seasonality-in-bitcoin-intraday-trend-trading/) |
+
+### Escola de day trade (QQQ, SPY, DIA, IWM)
+
+Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 min confirma e o gatilho sai no candle de 5 ou 1 minuto (a escola testa os dois). Opera comprado e vendido, o stop vem do gráfico (fundo ou topo do gatilho), não abre nada depois das 15h e zera tudo às 15h50 de Nova York. Custo: 0,01% por lado (spread e corretagem de ETF líquido).
+
+| Estratégia | Origem | Regra | Fonte |
+| --- | --- | --- | --- |
+| ORB 5 min e 15 min | Zarattini e Aziz (2023) | Lado do primeiro candle do pregão; stop no outro extremo; alvo 10x ou fim do dia | [SSRN](https://papers.ssrn.com/abstract=4416622) |
+| Área de ruído + VWAP | Zarattini, Aziz e Barbon (2024) | Nas meias horas, fora da área de ruído de 14 dias e da VWAP; stop móvel no limite/VWAP | [CXO Advisory](https://www.cxoadvisory.com/momentum-investing/complex-intraday-time-series-momentum-strategy-applied-to-spy/) |
+| Heikin-Ashi + MME 9/21 | Dan Valcu (HA) | 60 min com MME9 > MME21 e HA a favor, 15 min acima da MME21, gatilho na virada do HA após recuo, VWAP a favor | [Investopedia](https://www.investopedia.com/trading/heikin-ashi-better-candlestick/) |
+| Teoria de Dow em 3 tempos | Charles Dow | 60 e 15 min com topos e fundos a favor; gatilho no rompimento do último topo/fundo | [Investopedia](https://www.investopedia.com/terms/d/dowtheory.asp) |
+| Dow 60 min + gatilho Heikin-Ashi | combinação pedida | Tendência de Dow no 60 min, gatilho na virada do HA, VWAP a favor | - |
+
+Uma réplica independente do ORB com custos ([mql5, 2026](https://www.mql5.com/en/blogs/post/776235)) mostrou que a vantagem bruta quase some depois dos custos. Por isso a escola cobra custos e exige a prova fora da amostra.
+
+**Histórico intradiário:** o Yahoo só guarda 60 dias de 5 min e 30 dias de 1 min, pouco para a escola (que pede 30 operações no treino). Duas saídas:
+
+1. O workflow **Coleta de candles** guarda os candles de 5 e 1 min todo dia útil no branch `dados-intraday`. O histórico cresce sozinho.
+2. Com uma chave gratuita da [Massive](https://massive.com) (antiga Polygon.io) no segredo `MASSIVE_API_KEY` do repositório, a escola baixa cerca de 2 anos de candles de 1 min.
 
 1. **Backtest** de pelo menos 2 anos: fator de lucro acima de 1,3, queda máxima abaixo de 15% e pelo menos 100 operações. O comando `backtest` já diz se o trader passou.
 2. **Paper trading** por pelo menos 30 dias, com resultados perto do backtest.
