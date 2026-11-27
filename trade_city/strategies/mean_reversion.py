@@ -10,6 +10,7 @@ from .base import Strategy
 class MeanReversion(Strategy):
     """Retorno à média: compra sobrevenda curta dentro de tendência de alta longa."""
 
+    has_exit = True
     name = "retorno à média"
     description = "Compra quando o IFR({rsi_n}) cai abaixo de {threshold} com o preço acima da média de {trend} e sai acima da média de {exit_n}."
 

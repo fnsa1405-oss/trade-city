@@ -13,6 +13,7 @@ NY = ZoneInfo("America/New_York")
 class OpeningRangeBreakout(Strategy):
     """Rompimento da faixa de abertura do pregão americano (candles intradiários)."""
 
+    has_exit = True
     name = "rompimento da faixa de abertura"
     description = "Marca a máxima dos primeiros {minutes} minutos do pregão e compra no primeiro fechamento acima dela."
 

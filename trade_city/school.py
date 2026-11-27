@@ -138,6 +138,8 @@ def evaluate(
         train_bars = bars[:split]
         for cand in candidates:
             for rv in risks:
+                if rv.reward_ratio >= 10 and not cand.make().has_exit:
+                    continue  # sem alvo e sem regra de saída, a operação só termina no stop
                 risk = replace(base_risk, atr_stop_multiple=rv.atr_stop_multiple, reward_ratio=rv.reward_ratio)
                 student = replace(trader, strategy=cand.make(), timeframe=tf)
                 train = run_backtest(student, train_bars, risk)

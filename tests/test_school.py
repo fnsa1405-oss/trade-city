@@ -39,3 +39,13 @@ def test_school_runs_grid_and_reports():
     assert best is not None
     text = report_markdown(bia, results)
     assert "Bia Satoshi" in text and "treino" in text and "prova" in text
+
+
+def test_no_target_variant_only_for_strategies_with_exit():
+    bia = default_traders()[0]
+    bars = make_bars([100 + math.sin(i / 5) for i in range(400)])
+    no_target = [rv for rv in RISK_VARIANTS if rv.reward_ratio >= 10]
+    trend = [c for c in CANDIDATES if not c.make().has_exit][:1]
+    turtle = [c for c in CANDIDATES if c.label.startswith("Turtle")][:1]
+    assert evaluate(bia, {"1h": bars}, candidates=trend, risks=no_target) == []
+    assert len(evaluate(bia, {"1h": bars}, candidates=turtle, risks=no_target)) == 1

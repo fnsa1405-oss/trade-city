@@ -62,7 +62,7 @@ Tudo que a mesa decide fica em `trade_city.db` (SQLite): cada sinal, cada recusa
 
 ## Escola de traders (antes da conta real)
 
-`python -m trade_city escola` (ou a aba **Actions** > **Escola**) testa, para cada trader, 12 estratégias × 4 ajustes de stop/alvo × tempos gráficos (1h, 4h e diário em cripto; 1h e diário em ações). A combinação é escolhida nos 70% iniciais do histórico (treino: fator de lucro ≥ 1,3, queda ≤ 15%, ≥ 30 operações) e só é aprovada se confirmar nos 30% finais, que ela nunca viu (prova: fator de lucro ≥ 1,1, resultado positivo, ≥ 10 operações). 
+`python -m trade_city escola` (ou a aba **Actions** > **Escola**) testa, para cada trader, 12 estratégias × até 4 ajustes de stop/alvo × tempos gráficos (1h, 4h e diário em cripto; 1h e diário em ações). A combinação é escolhida nos 70% iniciais do histórico (treino: fator de lucro ≥ 1,3, queda ≤ 15%, ≥ 30 operações) e só é aprovada se confirmar nos 30% finais, que ela nunca viu (prova: fator de lucro ≥ 1,1, resultado positivo, ≥ 10 operações). 
 
 Além das estratégias da casa, a escola testa estratégias que traders conhecidos divulgaram publicamente (`trade_city/strategies/published.py`):
 

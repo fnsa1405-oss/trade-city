@@ -13,7 +13,11 @@ from ..models import Bar
 from .base import Strategy
 
 
-class TurtleBreakout(Strategy):
+class _WithExit(Strategy):
+    has_exit = True
+
+
+class TurtleBreakout(_WithExit):
     """Turtle (Richard Dennis): rompimento de N candles, saída na mínima de M candles.
     Sistema 1 = 20/10, Sistema 2 = 55/20.
     Fonte: https://www.ig.com/uk/trading-strategies/turtle-trading--what-is-it-and-what-are-the-rules--180904"""
@@ -37,7 +41,7 @@ class TurtleBreakout(Strategy):
         return prior_low is not None and bars[-1].close < prior_low
 
 
-class ConnorsRSI2(Strategy):
+class ConnorsRSI2(_WithExit):
     """Larry Connors, RSI(2): acima da MM200, compra com IFR(2) <= 5, sai acima da MM5.
     Fonte: https://chartschool.stockcharts.com/table-of-contents/trading-strategies-and-models/trading-strategies/rsi-2"""
 
@@ -58,7 +62,7 @@ class ConnorsRSI2(Strategy):
         return self._inner.should_exit(bars)
 
 
-class DoubleSevens(Strategy):
+class DoubleSevens(_WithExit):
     """Larry Connors, Double 7s: acima da MM200, compra no menor fechamento de 7 dias,
     sai no maior fechamento de 7 dias.
     Fonte: https://therighttrader.com/learn/trading-strategies/double-sevens-strategy"""
@@ -81,7 +85,7 @@ class DoubleSevens(Strategy):
         return len(closes) >= 7 and closes[-1] >= max(closes[-7:])
 
 
-class HolyGrail(Strategy):
+class HolyGrail(_WithExit):
     """Linda Raschke, Holy Grail: tendência forte (ADX(14) acima de 30), o preço recua até a
     MME20 e a compra acontece quando rompe a máxima do candle anterior. Saída: perda da
     mínima dos últimos 5 candles (aproximação do stop móvel no fundo mais recente).
@@ -116,7 +120,7 @@ class HolyGrail(Strategy):
         return prior_low is not None and bars[-1].close < prior_low
 
 
-class WilliamsBreakout(Strategy):
+class WilliamsBreakout(_WithExit):
     """Larry Williams, rompimento de volatilidade: compra quando o preço passa da abertura
     mais k vezes a amplitude do candle anterior. Aqui o sinal exige o fechamento acima
     desse nível, e a saída é no fim do candle seguinte (saída por tempo).
