@@ -1,0 +1,15 @@
+Trade City (paper)
+
+Teo Chip  (QQQ, Heikin-Ashi + MME 9/21 (60/15/gatilho))
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
+Dona Lena  (SPY, Heikin-Ashi + MME 9/21 (60/15/gatilho))
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
