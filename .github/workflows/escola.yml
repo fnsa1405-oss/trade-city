@@ -3,6 +3,12 @@ name: Escola
 # Disparo manual pelo celular: aba Actions > Escola > Run workflow.
 # Cada trader testa várias estratégias e tempos gráficos com dados públicos.
 on:
+  # roda também em PRs que mexem na escola, para conferir o resultado antes do merge
+  pull_request:
+    paths:
+      - "trade_city/school.py"
+      - "trade_city/strategies/**"
+      - ".github/workflows/escola.yml"
   workflow_dispatch:
     inputs:
       trader:
@@ -30,8 +36,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Rodar a escola
         env:
-          TRADER: ${{ inputs.trader }}
-          DIAS: ${{ inputs.dias }}
+          TRADER: ${{ inputs.trader || 'todos' }}
+          DIAS: ${{ inputs.dias || 1095 }}
         run: |
           python -m trade_city escola "$TRADER" --dias "$DIAS" --saida escola.md
           cat escola.md >> "$GITHUB_STEP_SUMMARY"
