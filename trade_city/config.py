@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TrendFollower, TurtleBreakout
+from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
 
 
 @dataclass(frozen=True)
@@ -74,12 +74,16 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="sol",
             name="Sol Ventura",
-            persona="Rápida e ousada: vive no ritmo da Solana.",
+            persona="Rápida e ousada: compra a Solana quando o retorno de 28 dias vira positivo.",
             symbol="SOL/USD",
             asset_class=AssetClass.CRYPTO,
-            timeframe="1h",
-            strategy=TrendFollower(fast=20, slow=50, breakout=20),
-            data_lookback_days=10,
+            timeframe="1d",
+            strategy=TimeSeriesMomentum(28),
+            data_lookback_days=90,
+            # escola 28/11/2026 (~5 anos de histórico): momento de série temporal 28, prova com fator de lucro 1,62
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando o retorno de 28 dias fica negativo
         ),
         TraderProfile(
             key="rui",
@@ -97,12 +101,16 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="dora",
             name="Dora Doge",
-            persona="A mais animada do escritório: opera Dogecoin com stop sempre apertado.",
+            persona="A mais animada do escritório: segue a maioria dos canais no Dogecoin.",
             symbol="DOGE/USD",
             asset_class=AssetClass.CRYPTO,
-            timeframe="1h",
-            strategy=TrendFollower(fast=20, slow=50, breakout=20),
-            data_lookback_days=10,
+            timeframe="4h",
+            strategy=DonchianEnsemble(),
+            data_lookback_days=100,
+            # escola 28/11/2026 (~5 anos de histórico): Donchian em conjunto 4h, prova com fator de lucro 1,17
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando a maioria dos canais sai
         ),
         TraderProfile(
             key="teo",
