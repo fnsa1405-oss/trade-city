@@ -27,6 +27,7 @@ from .backtest import run_backtest
 from .config import RiskConfig, TraderProfile
 from .models import AssetClass, ClosedTrade
 
+WEEKEND_BOOSTS = (1.0, 1.5, 2.0)  # risco das criptos no fim de semana (bolsa fechada)
 RISK_GRID = (0.0025, 0.005, 0.0075, 0.01, 0.0125, 0.015, 0.02)
 CLUSTER_CORR = 0.4
 MAX_TRAIN_DD = 0.12
@@ -210,6 +211,20 @@ def portfolio_report(traders: Sequence[TraderProfile], days: int = 2900, bars_fo
     levels = evaluate_levels(runs, halts, capital, start, end, split)
     passing = [lv for lv in levels if lv.ok]
     chosen = max(passing, key=lambda lv: lv.risk) if passing else min(levels, key=lambda lv: lv.risk)
+    # comparação: o mesmo risco sem os pesos (todos com peso 1)
+    runs_eq, halts_eq = {}, []
+    for t in approved:
+        rep = run_backtest(t, bars[t.key], replace(base, risk_per_trade=chosen.risk))
+        runs_eq[t.key] = rep.trades
+        if rep.halted_at:
+            halts_eq.append((t.key, rep.halted_at.date()))
+    equal = evaluate_levels({chosen.risk: runs_eq}, {chosen.risk: halts_eq}, capital, start, end, split)[0]
+    use_weights = equal.ok is False or (
+        chosen.ok and chosen.test_ret / max(chosen.test_dd, 0.01) >= equal.test_ret / max(equal.test_dd, 0.01) * 0.9
+        and chosen.train_ret / max(chosen.train_dd, 0.01) >= equal.train_ret / max(equal.train_dd, 0.01)
+    )
+    if not use_weights:
+        weights = {k: 1.0 for k in keys}
 
     lines = [
         "## Gestão de carteira",
@@ -241,12 +256,57 @@ def portfolio_report(traders: Sequence[TraderProfile], days: int = 2900, bars_fo
         lines.append(
             f"| {lv.risk:.2%}{mark} | {lv.train_ret:+.1%} | {lv.train_dd:.1%} | {lv.mc_dd:.1%} | {lv.test_ret:+.1%} | {lv.test_dd:.1%} | {halted} | {'sim' if lv.ok else 'não'} |"
         )
+    lines.append(
+        f"| {equal.risk:.2%} sem pesos (todos iguais) | {equal.train_ret:+.1%} | {equal.train_dd:.1%} | {equal.mc_dd:.1%} | {equal.test_ret:+.1%} | {equal.test_dd:.1%} | "
+        f"{', '.join(names[k] for k in equal.halted) or '-'} | {'sim' if equal.ok else 'não'} |"
+    )
     lines += [
+        "",
+        f"Pesos da paridade de risco: {'mantidos' if use_weights else 'descartados (todos iguais foi melhor)'}. Ficam só se o retorno por queda no treino for pelo menos igual e a prova não piorar mais que 10%.",
         "",
         f"Critério: maior risco sem trader parado pela trava de queda no treino, queda máxima no treino até {MAX_TRAIN_DD:.0%} e até {MAX_MC_DD:.0%} em 95% dos anos simulados.",
         f"Limites da carteira no Auditor: risco aberto somado até {MAX_PORTFOLIO_RISK:.1%} do capital total e até {MAX_CLUSTER_RISK:.1%} por grupo correlacionado.",
         "",
     ]
+    # fim de semana: com a bolsa fechada, só as criptos operam. Testa dar mais risco a elas
+    # nesses dias, no risco escolhido; só liga se melhorar o treino sem quebrar os critérios
+    # e não piorar a prova (retorno por unidade de queda)
+    boost_rows = []
+    for boost in WEEKEND_BOOSTS:
+        runs_b, halts_b = {}, []
+        for t in approved:
+            cfg = replace(base, risk_per_trade=chosen.risk * weights[t.key], weekend_crypto_boost=boost)
+            rep = run_backtest(t, bars[t.key], cfg)
+            runs_b[t.key] = rep.trades
+            if rep.halted_at:
+                halts_b.append((t.key, rep.halted_at.date()))
+        lv = evaluate_levels({chosen.risk: runs_b}, {chosen.risk: halts_b}, capital, start, end, split)[0]
+        boost_rows.append((boost, lv))
+
+    def score(lv):
+        return lv.train_ret / max(lv.train_dd, 0.01)
+
+    def test_score(lv):
+        return lv.test_ret / max(lv.test_dd, 0.01)
+
+    plain = boost_rows[0][1]
+    best_boost = 1.0
+    for boost, lv in boost_rows[1:]:
+        if lv.ok and score(lv) > score(plain) and test_score(lv) >= test_score(plain) and lv.train_ret > plain.train_ret:
+            best_boost = boost
+    lines += [
+        "### Fim de semana: prioridade às criptos",
+        "",
+        f"No risco escolhido ({chosen.risk:.2%}), com o risco das criptos multiplicado nos sábados e domingos (horário de Nova York):",
+        "",
+        "| Reforço | Treino: retorno/ano | Treino: queda máx. | Queda em 95% dos anos | Prova: retorno/ano | Prova: queda máx. | Passa? |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for boost, lv in boost_rows:
+        mark = " **(escolhido)**" if boost == best_boost else ""
+        lines.append(f"| {boost:g}x{mark} | {lv.train_ret:+.1%} | {lv.train_dd:.1%} | {lv.mc_dd:.1%} | {lv.test_ret:+.1%} | {lv.test_dd:.1%} | {'sim' if lv.ok else 'não'} |")
+    lines += ["", "Só liga se passar nos critérios, ganhar mais no treino com melhor retorno por queda e não piorar a prova.", ""]
+
     group_of = {k: i for i, g in enumerate(groups) for k in g}
     alloc = {
         "risk_per_trade": chosen.risk,
@@ -254,5 +314,6 @@ def portfolio_report(traders: Sequence[TraderProfile], days: int = 2900, bars_fo
         "groups": {k: f"grupo{group_of[k] + 1}" for k in keys},
         "max_portfolio_risk": MAX_PORTFOLIO_RISK,
         "max_cluster_risk": MAX_CLUSTER_RISK,
+        "weekend_crypto_boost": best_boost,
     }
     return "\n".join(lines), alloc

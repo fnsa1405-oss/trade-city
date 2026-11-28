@@ -173,6 +173,7 @@ class Desk:
             buying_power=self.broker.buying_power(),
             kill_switch=self.ledger.kill_switch,
             market_open=self.broker.is_market_open(trader.asset_class),
+            asset_class=trader.asset_class,
             **self._portfolio_risk(trader),
         )
         audit = Auditor(risk).review(plan, ctx)

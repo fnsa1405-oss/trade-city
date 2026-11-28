@@ -47,3 +47,16 @@ def test_portfolio_report_with_fake_data():
     assert set(alloc["weights"]) == {t.key for t in default_traders() if t.approved}
     assert abs(sum(alloc["weights"].values()) - len(alloc["weights"])) < 0.01
     assert alloc["risk_per_trade"] in (0.0025, 0.005, 0.0075, 0.01, 0.0125, 0.015, 0.02)
+
+
+def test_weekend_boost_only_for_crypto_on_weekends():
+    from trade_city.config import RiskConfig, weekend_multiplier
+    from trade_city.models import AssetClass
+
+    cfg = RiskConfig(weekend_crypto_boost=1.5)
+    sat = datetime(2026, 11, 28, 15, tzinfo=timezone.utc)
+    mon = datetime(2026, 11, 30, 15, tzinfo=timezone.utc)
+    assert weekend_multiplier(cfg, AssetClass.CRYPTO, sat) == 1.5
+    assert weekend_multiplier(cfg, AssetClass.CRYPTO, mon) == 1.0
+    assert weekend_multiplier(cfg, AssetClass.EQUITY, sat) == 1.0
+    assert weekend_multiplier(RiskConfig(), AssetClass.CRYPTO, sat) == 1.0

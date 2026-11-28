@@ -24,6 +24,9 @@ class RiskConfig:
     # correlacionado, em fração do capital total da mesa
     max_portfolio_risk: float = 0.03
     max_cluster_risk: float = 0.015
+    # fim de semana (sábado e domingo em Nova York, bolsa fechada): multiplica o risco das
+    # criptos, que são as únicas que operam. Calibrado em carteira.py (1 = desligado)
+    weekend_crypto_boost: float = 1.0
     daily_win_goal: int = 10
     profit_milestone: float = 100.0  # a cada marco de lucro (USD), um novo aprendiz é liberado
     timezone: str = "America/Sao_Paulo"  # define o "dia" do placar
@@ -48,6 +51,15 @@ class TraderProfile:
     # operação) e grupo de ativos correlacionados (limite de risco aberto por grupo)
     risk_weight: float = 1.0
     group: str = ""
+
+
+def weekend_multiplier(cfg: RiskConfig, asset_class: AssetClass, ts) -> float:
+    """Multiplicador de risco das criptos no fim de semana (bolsa fechada)."""
+    if cfg.weekend_crypto_boost == 1.0 or asset_class is not AssetClass.CRYPTO or ts is None:
+        return 1.0
+    from zoneinfo import ZoneInfo
+
+    return cfg.weekend_crypto_boost if ts.astimezone(ZoneInfo("America/New_York")).weekday() >= 5 else 1.0
 
 
 def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:

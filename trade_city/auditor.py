@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .config import RiskConfig
-from .models import AuditResult, Side, TradePlan
+from .config import RiskConfig, weekend_multiplier
+from .models import AssetClass, AuditResult, Side, TradePlan
 from .mood import Mood
 
 
@@ -22,6 +22,7 @@ class AuditContext:
     # carteira: capital total da mesa e risco já aberto (somado e no grupo do trader).
     # portfolio_capital = 0 desliga a checagem (backtest de um trader só)
     portfolio_capital: float = 0.0
+    asset_class: AssetClass | None = None  # para o reforço das criptos no fim de semana
     portfolio_open_risk: float = 0.0
     group_open_risk: float = 0.0
 
@@ -51,6 +52,7 @@ class Auditor:
             reasons.append(f"alvo de {plan.reward_ratio:.2f}x o risco, mínimo {cfg.min_reward_ratio}x")
 
         max_risk = ctx.capital * cfg.risk_per_trade * Mood.CONFIANTE.size_multiplier
+        max_risk *= weekend_multiplier(cfg, ctx.asset_class, plan.signal.ts)
         if ctx.unit_margin and plan.qty == 1:
             max_risk = max(max_risk, ctx.capital * cfg.max_contract_risk)  # 1 micro contrato
         if plan.risk_amount > max_risk * 1.01:  # folga para arredondamento de centavos
