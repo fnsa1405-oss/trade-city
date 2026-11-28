@@ -20,6 +20,11 @@ on:
         type: choice
         options: [todos, bia, edu, sol, rui, dora, teo, lena, davi, ivo]
         default: todos
+      modo:
+        description: "normal ou swing (índices em swing, 60 min e diário)"
+        type: choice
+        options: [normal, swing]
+        default: normal
       dias:
         description: "Dias de histórico (cripto)"
         type: number
@@ -51,6 +56,7 @@ jobs:
           MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
           TRADER: ${{ inputs.trader || 'todos' }}
           DIAS: ${{ inputs.dias || 1095 }}
+          MODO: ${{ inputs.modo || 'normal' }}
         run: |
-          python -m trade_city escola "$TRADER" --dias "$DIAS" --saida escola.md
+          python -m trade_city escola "$TRADER" --dias "$DIAS" --modo "$MODO" --saida escola.md
           cat escola.md >> "$GITHUB_STEP_SUMMARY"
