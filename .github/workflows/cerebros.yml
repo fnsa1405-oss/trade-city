@@ -1,0 +1,64 @@
+name: Treino dos cérebros
+
+# Todo sábado (e quando quiser, pelo Run workflow) cada trader treina o seu cérebro:
+# uma rede neural pequena que aprende, com as operações que a estratégia dele teria
+# feito, quando vale a pena entrar. Só é promovido se filtrar melhor do que operar sem
+# ele numa parte final do histórico que nunca viu. Os cérebros ficam no branch
+# "cerebros" e as mesas carregam de lá. Travas de risco ficam fora do alcance deles.
+on:
+  schedule:
+    - cron: "0 12 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cerebros
+  cancel-in-progress: false
+
+jobs:
+  treino:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Abrir candles guardados e cérebros atuais
+        run: |
+          if git fetch --depth=1 origin dados-intraday; then
+            git worktree add -B dados-intraday "$RUNNER_TEMP/dados-intraday" FETCH_HEAD
+            ln -s "$RUNNER_TEMP/dados-intraday/dados" dados
+          fi
+          WT="$RUNNER_TEMP/cerebros"
+          if git fetch --depth=1 origin cerebros; then
+            git worktree add -B cerebros "$WT" FETCH_HEAD
+          else
+            git worktree add --orphan -b cerebros "$WT"
+          fi
+          mkdir -p "$WT/cerebros"
+
+      - name: Treinar
+        run: |
+          python -m trade_city cerebros --pasta "$RUNNER_TEMP/cerebros/cerebros" --saida relatorio.md
+          cat relatorio.md >> "$GITHUB_STEP_SUMMARY"
+          cp relatorio.md "$RUNNER_TEMP/cerebros/relatorio.md"
+
+      - name: Salvar no branch cerebros
+        run: |
+          cd "$RUNNER_TEMP/cerebros"
+          git config user.name "trade-city-cerebros"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f .
+          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+          git commit -q -m "cérebros: treino $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do
+            git push origin cerebros && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

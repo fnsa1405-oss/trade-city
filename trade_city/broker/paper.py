@@ -74,7 +74,16 @@ class PaperBroker(Broker):
         cols = {row[1] for row in conn.execute("PRAGMA table_info(paper_positions)")}
         if "side" not in cols:
             conn.execute("ALTER TABLE paper_positions ADD COLUMN side TEXT NOT NULL DEFAULT 'compra'")
-        conn.execute("INSERT OR IGNORE INTO paper_account (id, cash) VALUES (1, ?)", (initial_cash,))
+        acc_cols = {row[1] for row in conn.execute("PRAGMA table_info(paper_account)")}
+        if "funded" not in acc_cols:
+            conn.execute("ALTER TABLE paper_account ADD COLUMN funded REAL")
+        conn.execute("INSERT OR IGNORE INTO paper_account (id, cash, funded) VALUES (1, ?, ?)", (initial_cash, initial_cash))
+        conn.execute("UPDATE paper_account SET funded = cash WHERE id = 1 AND funded IS NULL")
+        # trader novo na mesa: deposita a diferença (o capital dele)
+        conn.execute(
+            "UPDATE paper_account SET cash = cash + (? - funded), funded = ? WHERE id = 1 AND funded < ?",
+            (initial_cash, initial_cash, initial_cash),
+        )
         conn.commit()
 
     # custos -------------------------------------------------------------

@@ -15,16 +15,26 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Trader | Ativo | Tempo gráfico | Estratégia | Situação |
 | --- | --- | --- | --- | --- |
 | Rui Xis (`rui`) | XRP/USD | 4h | Donchian em conjunto (Zarattini/Pagani/Barbon), stop 2 ATR | aprovado na escola |
-| Teo Chip (`teo`) | QQQ (Nasdaq 100) | day trade: 60/15 min + gatilho 5 min | Heikin-Ashi + MME 9/21, stop no recuo, sai na virada do HA de 15 min | aprovado na escola de day trade |
-| Dona Lena (`lena`) | SPY (S&P 500) | day trade: 60/15 min + gatilho 5 min | Heikin-Ashi + MME 9/21, stop no recuo, alvo 3x | aprovada na escola de day trade |
+| Teo Chip (`teo`) | QQQ (Nasdaq 100) | day trade, gatilho 1 min | ORB 15 min, alvo 2x | na escola (o cérebro tenta filtrar) |
+| Dona Lena (`lena`) | SPY (S&P 500) | day trade, gatilho 5 min | ORB 15 min, alvo 3x | na escola (o cérebro tenta filtrar) |
 | Bia Satoshi (`bia`) | BTC/USD | - | - | na escola |
 | Edu Éter (`edu`) | ETH/USD | - | - | na escola |
 | Sol Ventura (`sol`) | SOL/USD | - | - | na escola |
 | Dora Doge (`dora`) | DOGE/USD | - | - | na escola |
-| Davi Dow (`davi`) | DIA (Dow Jones) | day trade 5/1 min | - | na escola de day trade |
-| Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade 5/1 min | - | na escola de day trade |
+| Davi Dow (`davi`) | DIA (Dow Jones) | day trade, gatilho 5 min | ORB 15 min, alvo 3x | na escola (o cérebro tenta filtrar) |
+| Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade, gatilho 1 min | ORB 5 min, alvo 2x | na escola (o cérebro tenta filtrar) |
 
-Atenção: Teo e Lena foram aprovados no day trade com só 43 pregões de histórico (o que o Yahoo guarda). É pouco. Os 30 dias de mesa simulada são o teste de verdade, e a escola roda de novo quando o histórico crescer.
+Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova (27/11/2026). A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
+
+## Cérebros (rede neural de cada trader)
+
+`python -m trade_city cerebros` (ou **Actions** > **Treino dos cérebros**, todo sábado) dá a cada trader uma rede neural pequena (`trade_city/brain.py`). A estratégia continua achando as oportunidades. O cérebro olha o clima do gráfico na hora (tendência, volatilidade, distância das médias, IFR, volume, horário, lado) e estima a chance de dar certo. Abaixo do limite, o trader deixa passar.
+
+- Treina nos 70% iniciais das operações e escolhe o limite numa validação dentro do treino.
+- Só é **promovido** se, nos 30% finais (que nunca viu), filtrar melhor que operar sem ele: fator de lucro pelo menos 5% maior e acima de 1,1, resultado positivo e pelo menos 30% das operações mantidas.
+- Trader com cérebro promovido entra na mesa simulada, mesmo sem aprovação da escola. Se a configuração do trader mudar, o cérebro antigo deixa de valer.
+- Ele nunca mexe nas travas: stop, tamanho, perdas do dia e botão de pânico continuam com o Guardião e o Auditor.
+- Técnica: *meta-labeling* (Marcos López de Prado, *Advances in Financial Machine Learning*, 2018).
 
 Só os aprovados operam na mesa (`rodar`). Os demais continuam sendo testados pela escola.
 
