@@ -1,0 +1,39 @@
+name: Notícias do telão
+
+# Busca manchetes de mercado do dia (RSS em português, com a Massive de reserva) e grava
+# noticias.json no branch "noticias". O telão do escritório 3D lê esse arquivo.
+# Quem dispara de hora em hora é o Relógio (.github/scripts/relogio.py).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: noticias
+  cancel-in-progress: false
+
+jobs:
+  noticias:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Buscar manchetes
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+        run: python3 .github/scripts/noticias.py "$RUNNER_TEMP/noticias.json"
+      - name: Salvar no branch noticias
+        run: |
+          [ -f "$RUNNER_TEMP/noticias.json" ] || exit 0
+          WT="$RUNNER_TEMP/noticias"
+          if git fetch --depth=1 origin noticias; then git worktree add -B noticias "$WT" FETCH_HEAD; else git worktree add --orphan -b noticias "$WT"; fi
+          cp "$RUNNER_TEMP/noticias.json" "$WT/"
+          cd "$WT"
+          git config user.name "trade-city-noticias"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f noticias.json
+          git diff --cached --quiet && exit 0
+          git commit -q -m "notícias $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3 4; do git push -q origin HEAD:noticias && exit 0; sleep $((i * 5)); done
+          exit 1
