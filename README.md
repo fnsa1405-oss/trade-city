@@ -177,6 +177,10 @@ Dá para rodar o backtest sem computador e sem conta em corretora, direto no Git
 1. Abra a aba **Actions** > **Backtest** > **Run workflow**, escolha o trader e confirme.
 2. Quando terminar, abra a execução: o resultado aparece no resumo (Summary).
 
+### Relógio (agenda)
+
+O agendador (cron) do GitHub não dispara neste repositório. O workflow **Relógio** faz esse papel: fica ligado em turnos de ~5h40, confere a agenda a cada minuto e dispara Mesa day trade (dias úteis, pregão), Coleta de candles (dias úteis, 18h20 de Brasília), Treino dos cérebros (sábado, 9h) e Escola (domingo, 9h). No fim de cada turno ele chama o próximo. Se um dia parar, basta abrir Actions > Relógio > Run workflow.
+
 ### Mesa simulada (30 dias antes de qualquer dinheiro real)
 
 O workflow **Mesa simulada** roda sozinho a cada 30 minutos com os traders aprovados na escola. Para ver como está:
