@@ -1,0 +1,24 @@
+{
+  "fonte": "exemplo baseado no placar.txt do branch mesa-dados em 27/11/2026",
+  "atualizado": "2026-11-27T21:30:00-03:00",
+  "modo": "simulado",
+  "dia": 1,
+  "dias_total": 30,
+  "regras": {"meta_vitorias": 10, "trava_derrotas": 5, "trava_queda_pct": 10},
+  "traders": [
+    {"key": "rui", "nome": "Rui Xis", "ativo": "XRP/USD", "estrategia": "Tendência 4h · stop 1,5 ATR · alvo 3x", "pf_escola": 1.51, "humor": "normal", "vitorias": 0, "derrotas": 0, "capital": 10000, "posicao": "nenhuma", "cor": "#3fb6f2", "fala": "Calma. O XRP ainda não saiu do lugar."},
+    {"key": "teo", "nome": "Teo Chip", "ativo": "QQQ (Nasdaq)", "estrategia": "Turtle 20/10 · rompimento de 20 dias", "pf_escola": 1.42, "humor": "normal", "vitorias": 0, "derrotas": 0, "capital": 10000, "posicao": "nenhuma", "cor": "#7b6cff", "fala": "Rompeu 20 dias? Aí eu entro."},
+    {"key": "lena", "nome": "Dona Lena", "ativo": "SPY (S&P 500)", "estrategia": "Turtle 20/10 · sistema 1", "pf_escola": 1.59, "humor": "normal", "vitorias": 0, "derrotas": 0, "capital": 10000, "posicao": "nenhuma", "cor": "#d38cff", "fala": "Paciência, meu bem. Tendência é tudo."}
+  ],
+  "equipe": [
+    {"key": "nico", "nome": "Nico", "papel": "analista", "cor": "#3ddc97", "fala": "Tendência a favor. Pode seguir."},
+    {"key": "rocha", "nome": "Rocha", "papel": "guardião de risco", "cor": "#ff7a45", "fala": "Stop 1,5 ATR. Alvo 3x o risco."},
+    {"key": "vera", "nome": "Vera", "papel": "auditora", "cor": "#f2f4ff", "fala": "Placar ok, longe da trava. Liberado."}
+  ],
+  "escola": [
+    {"key": "bia", "nome": "Bia Satoshi", "ativo": "BTC", "cor": "#ffb547", "status": "estudando"},
+    {"key": "edu", "nome": "Edu Éter", "ativo": "ETH", "cor": "#8f9bff", "status": "estudando"},
+    {"key": "sol", "nome": "Sol Ventura", "ativo": "SOL", "cor": "#ff6fcf", "status": "estudando"},
+    {"key": "dora", "nome": "Dora Doge", "ativo": "DOGE", "cor": "#ffd84d", "status": "estudando"}
+  ]
+}

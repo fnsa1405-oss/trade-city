@@ -590,6 +590,10 @@ function iniciar() {
   setInterval(proximaRodada, 30_000);
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && atualizarTudo());
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (location.hash === "#panico") {
+    history.replaceState(null, "", location.pathname);
+    setTimeout(() => $("#btn-panico").click(), 600);
+  }
 }
 
 iniciar();
