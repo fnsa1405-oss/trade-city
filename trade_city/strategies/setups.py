@@ -9,11 +9,31 @@ gráfico de 60 minutos (MME9 acima da MME21 para comprar, abaixo para vender).
 """
 from __future__ import annotations
 
-from ..intraday import dow_structure, ema_aligned
-from ..models import Entry, Side
+from ..intraday import Higher, dow_structure, ema_aligned
+from ..models import Bar, Entry, Side
 from .daytrade import _MultiTimeframe
 
 LONG, SHORT = Side.LONG, Side.SHORT
+
+
+def _upper(tl) -> Higher:
+    """Tempo gráfico de cima para o swing: diário a partir do 60 min, semanal a partir do
+    diário. Um bloco só conta como fechado quando começa o seguinte (sem olhar o futuro)."""
+    intraday = tl.step < 24 * 60 and len(set(tl.dates[:50])) < len(tl.dates[:50])
+    key = (lambda d: d) if intraday else (lambda d: tuple(d.isocalendar())[:2])
+    out: list[Bar] = []
+    done_at: list[int] = []
+    group: list[Bar] = []
+    cur = None
+    for i, b in enumerate(tl.bars):
+        k = key(tl.dates[i])
+        if k != cur and group:
+            out.append(Bar(group[0].ts, group[0].open, max(x.high for x in group), min(x.low for x in group), group[-1].close, sum(x.volume for x in group)))
+            group = []
+        cur = k
+        group.append(b)
+        done_at.append(len(out))
+    return Higher(out, done_at)
 
 
 class _Setup(_MultiTimeframe):
@@ -22,11 +42,40 @@ class _Setup(_MultiTimeframe):
     context_days = 5
     valid_bars = 1
 
-    def __init__(self, confluence: bool = False, **kw):
+    def __init__(self, confluence: bool = False, swing: bool = False, **kw):
         super().__init__(**kw)
         self.confluence = confluence
-        if confluence:
+        self.swing = swing
+        if swing:
+            # swing: pode dormir posicionado; o tempo gráfico de cima é o diário (para o
+            # 60 min) ou o semanal (para o diário)
+            self.day_trade = False
+            self.name = self.name.replace(" + 60 min", "").replace(" + 15 min", "").replace(" + 60/15 min", "")
+            self.name = f"{self.name} swing" + (" + tempo de cima" if confluence else "")
+        elif confluence:
             self.name = f"{self.name} + 60 min"
+
+    @property
+    def window(self) -> int:
+        return 400 if self.swing else super().window
+
+    def _compute(self, tl):
+        if not self.swing:
+            return super()._compute(tl)
+        self.h1 = self.m15 = _upper(tl)
+        self._extra(tl)
+
+    def decide(self, bars):
+        if not self.swing:
+            return super().decide(bars)
+        i = self._at(bars)
+        return None if i is None else self._entry(self._tl, i)
+
+    def exit_signal(self, bars, side):
+        if not self.swing:
+            return super().exit_signal(bars, side)
+        i = self._at(bars)
+        return False if i is None else self._exit(self._tl, i, side)
 
     def _extra(self, tl):
         closes = [b.close for b in tl.bars]
@@ -49,7 +98,9 @@ class _Setup(_MultiTimeframe):
         return not self.confluence or self._h1_side(i) is side
 
     def _today(self, tl, i: int, n: int) -> bool:
-        """Os últimos n candles são todos do dia de hoje."""
+        """Os últimos n candles são todos do dia de hoje (no swing, só precisa existir)."""
+        if self.swing:
+            return i >= n - 1
         return tl.day_index[i] >= n - 1
 
     def _arm(self, tl, i: int, side: Side, stop: float, reason: str) -> Entry | None:

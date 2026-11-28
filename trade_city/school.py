@@ -102,6 +102,23 @@ DAY_CANDIDATES: list[Candidate] = [
     Candidate("IFR2 Stormer + 60 min", lambda: StormerIFR2()),
 ]
 
+# os mesmos setups em swing (60 min e diário), confluência com o tempo gráfico de cima
+SWING_SETUPS: list[Candidate] = [
+    Candidate("Larry Williams 9.1 swing", lambda: LarryWilliams91(swing=True)),
+    Candidate("Larry Williams 9.1 swing + tempo de cima", lambda: LarryWilliams91(confluence=True, swing=True)),
+    Candidate("Larry Williams 9.2 swing", lambda: LarryWilliams92(swing=True)),
+    Candidate("Larry Williams 9.2 swing + tempo de cima", lambda: LarryWilliams92(confluence=True, swing=True)),
+    Candidate("Larry Williams 9.3 swing", lambda: LarryWilliams93(swing=True)),
+    Candidate("Larry Williams 9.3 swing + tempo de cima", lambda: LarryWilliams93(confluence=True, swing=True)),
+    Candidate("Stormer 123 swing", lambda: Stormer123(swing=True)),
+    Candidate("Stormer 123 swing + tempo de cima", lambda: Stormer123(confluence=True, swing=True)),
+    Candidate("Ponto Contínuo MME21 swing", lambda: PontoContinuo(swing=True)),
+    Candidate("Ponto Contínuo MME21 swing + tempo de cima", lambda: PontoContinuo(confluence=True, swing=True)),
+    Candidate("Falha de estrutura 2B swing + tempo de cima", lambda: StructureFailure(swing=True)),
+    Candidate("Fibonacci 38-62% swing + tempo de cima", lambda: FibonacciPullback(swing=True)),
+    Candidate("IFR2 Stormer swing + tempo de cima", lambda: StormerIFR2(swing=True)),
+]
+
 RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 2 ATR, alvo 2x", 2.0, 2.0),
     RiskVariant("stop 3 ATR, alvo 2x", 3.0, 2.0),
