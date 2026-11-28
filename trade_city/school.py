@@ -15,6 +15,10 @@ from .data import resample
 from .models import AssetClass, Bar, ClosedTrade
 from .strategies import (
     ConnorsRSI2,
+    CumulativeRSI,
+    IBSReversion,
+    TimeSeriesMomentum,
+    TurnOfMonth,
     DonchianEnsemble,
     DoubleSevens,
     DowHeikinAshi,
@@ -79,6 +83,12 @@ CANDIDATES: list[Candidate] = [
     Candidate("Heikin-Ashi + MME50", lambda: HeikinAshiTrend()),
     Candidate("Teoria de Dow (topos e fundos)", lambda: DowSwing(3)),
     Candidate("Abertura da Ásia na segunda (Concretum)", lambda: MondayAsiaOpen()),
+    # pesquisa de 28/11/2026: anomalias com estudos publicados e replicados (fontes nos docstrings)
+    Candidate("Momento de série temporal 28 (Moskowitz/Liu-Tsyvinski)", lambda: TimeSeriesMomentum(28)),
+    Candidate("Momento de série temporal 56", lambda: TimeSeriesMomentum(56)),
+    Candidate("Virada do mês (Lakonishok/McConnell)", lambda: TurnOfMonth()),
+    Candidate("IBS < 0,2 acima da MM200 (Pagonidis)", lambda: IBSReversion()),
+    Candidate("IFR(2) acumulado (Connors/Alvarez)", lambda: CumulativeRSI()),
 ]
 
 # day trade em ações/ETFs: contexto 60 e 15 min, gatilho no candle de 5 ou 1 min
