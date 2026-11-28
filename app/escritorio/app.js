@@ -222,13 +222,13 @@ const FURN_PAL = { wood: [0xb48a5e, .55, 0], woodDark: [0x5e412d, .5, 0], carpet
 const furnCache = {};
 function furnMat(m) { const k = m.name; if (furnCache[k]) return furnCache[k]; const p = FURN_PAL[k]; let n;
   if (k === 'glass') n = new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, roughness: .05, metalness: 0, transparent: true, opacity: .35, envMapIntensity: 1.2 });
-  else if (p) { n = new THREE.MeshStandardMaterial({ color: p[0], roughness: p[1], metalness: p[2] }); if (k === 'lamp') { n.emissive = new THREE.Color(0xffd9a0); n.emissiveIntensity = 1.4; } }
+  else if (p) { n = new THREE.MeshStandardMaterial({ color: p[0], roughness: p[1], metalness: p[2] }); if (k === 'lamp') { n.emissive = new THREE.Color(0xffd9a0); n.emissiveIntensity = .55; } }
   else { n = m.clone(); n.roughness = .6; }
   n.name = k; return furnCache[k] = n; }
 async function loadFurniture() { const j = await (await fetch('assets/moveis.json')).json(); const out = {}; await Promise.all(Object.entries(j).map(async ([k, b64]) => { const g = await loader.parseAsync(b64ToBuf(b64), ''); g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.material = furnMat(o.material); } }); out[k] = g.scene; })); return out; }
 function put(name, x, z, rotY = 0, s = K, y = 0) { const src = FURN[name]; if (!src) return null; const o = src.clone(true); o.scale.setScalar(s); o.position.set(x, y, z); o.rotation.y = rotY; scene.add(o); return o; }
 // put() posiciona pelo canto do modelo; putC centraliza pelo bounding box
-function putC(name, x, z, rotY = 0, s = K, y = 0) { const o = put(name, 0, 0, rotY, s, y); if (!o) return null; const b = new THREE.Box3().setFromObject(o); const c = b.getCenter(new THREE.Vector3()); o.position.x += x - c.x; o.position.z += z - c.z;
+function putC(name, x, z, rotY = 0, s = K, y = 0) { const o = put(name, 0, 0, rotY, s, y); if (!o) return null; const b = new THREE.Box3().setFromObject(o); const c = b.getCenter(new THREE.Vector3()); o.position.x += x - c.x; o.position.z += z - c.z; if (y === 0 && b.min.y < -.02) { o.position.y -= b.min.y; b.translate(new THREE.Vector3(0, -b.min.y, 0)); }
   if (y < .1 && !/rug|book|lamp|keyboard|mouse|laptop|kitchenCoffee|kitchenMicro|toaster|plant/i.test(name)) { const sx = b.max.x - b.min.x, sz = b.max.z - b.min.z; if (sx < 4 && sz < 4) blob(x, z, sx * 1.35 + .2, sz * 1.35 + .2); } return o; }
 
 /* ---------- móveis próprios ---------- */
@@ -273,12 +273,12 @@ function lugaresSala(n) { const rows = n <= 6 ? 1 : n <= 12 ? 2 : 3, cols = Math
 function arrumarMesa(n) { const l = lugaresSala(n + 1); TRADER_POS.splice(0, TRADER_POS.length, ...l.slice(0, n)); VAGA_POS.splice(0, VAGA_POS.length, l[n]); }
 arrumarMesa(3);
 // onde alguém fica em pé para falar com um trader (atrás da cadeira, um pouco ao lado)
-const atrasDe = ([x, z]) => [x + .55, z + .82];
+const atrasDe = ([x, z]) => [x + .75, z + 1.0];
 const TEAM_POS = [[-8, 1.4], [-4.5, 1.4], [-1, 1.4]];
 const STUDENT_POS = [[6.2, 4.2], [8.8, 4.2], [6.2, 6.6], [8.8, 6.6]];
 const wallTex = canvasTex(MOBILE ? 1536 : 2048, MOBILE ? 440 : 587, () => { });
 const news = [newsTex(), newsTex()];
-let boardTex;
+let boardTex, SOFA = null, SOFA2 = null;
 // ---- recreação: pingue-pongue, pebolim e fliperama ----
 const ping = { bola: null, x0: 0, z: 0 };
 function pingPong(x, z) { const g = new THREE.Group(); g.position.set(x, 0, z);
@@ -309,10 +309,10 @@ function drawArcade(t) { const { g, c } = arcadeTex.userData; const W = c.width,
   g.fillStyle = '#ffd25e'; g.font = '700 20px "JetBrains Mono", monospace'; g.fillText('SCORE ' + String(Math.floor(t * 37) % 99999).padStart(5, '0'), 12, 24); arcadeTex.needsUpdate = true; }
 function buildOffice() {
   // SALA DE OPERAÇÕES: telão grande na parede do fundo, vidro na frente e à direita (porta no canto)
-  { const tw = 9.6, th = 2.75, wall = new THREE.Group();
+  { const tw = 8.7, th = 2.49, wall = new THREE.Group();
     const fr = rbox(tw + .3, th + .3, .16, .06, mat(0x0b0d1e, { roughness: .35, metalness: .3 })); wall.add(fr);
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(tw, th), new THREE.MeshBasicMaterial({ map: wallTex, toneMapped: false })); scr.position.z = .09; wall.add(scr);
-    wall.position.set(SALA.cx, 1.82, -D / 2 + .25); scene.add(wall);
+    wall.position.set(SALA.cx, 2.04, -D / 2 + .25); scene.add(wall);
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(tw + 3, 3.2), new THREE.MeshBasicMaterial({ map: glowTex, color: 0x4fa8ff, transparent: true, opacity: .1, depthWrite: false, blending: THREE.AdditiveBlending })); glow.rotation.x = -Math.PI / 2; glow.position.set(SALA.cx, .03, -D / 2 + 1.4); scene.add(glow); }
   rug(SALA.cx, (SALA.z0 + SALA.z1) / 2 + .3, SALA.x1 - SALA.x0 - 1.2, SALA.z1 - SALA.z0 - 1.1, 0x252a3a);
   { const gm = new THREE.MeshPhysicalMaterial({ color: 0xbfe0ff, transparent: true, opacity: .07, roughness: .05, depthWrite: false, envMapIntensity: .12, side: THREE.DoubleSide }), rail = mat(0xdfe5ff, { metalness: .5, roughness: .3 });
@@ -357,16 +357,16 @@ function buildOffice() {
     const pr = rbox(.9, .45, .55, .05, mat(0xf3f4f8, { roughness: .35 })); pr.position.y = .93; g.add(pr); const tr = rbox(.6, .04, .35, .01, mat(0x2a2f4d)); tr.position.set(0, 1.17, .05); g.add(tr);
     const paper = new THREE.Mesh(new THREE.BoxGeometry(.3, .02, .4), mat(0xffffff)); paper.position.set(0, 1.2, .05); g.add(paper);
     const led = new THREE.Mesh(new THREE.SphereGeometry(.02, 8, 8), new THREE.MeshBasicMaterial({ color: 0x3dff9a })); led.position.set(.35, 1.0, .28); g.add(led);
-    g.rotation.y = -Math.PI / 2; scene.add(g); putC('trashcan', 5.2, -.6, 0); }
+    g.rotation.y = Math.PI / 2; scene.add(g); putC('trashcan', 5.2, -.75, 0); }
 
   // LOUNGE (frente à esquerda): sofás, mesa de centro, TV, estante, luminárias, tapete redondo
   rug(-8.2, 6.2, 6.2, 4.6, 0x8c8073);
-  putC('loungeSofaLong', -8.4, 8.3, Math.PI); putC('loungeSofa', -10.9, 6.1, Math.PI / 2); putC('loungeChairRelax', -5.7, 6.4, -Math.PI / 2 - .3);
-  pingPong(-8.35, 6.0); pebolim(-10.9, 3.35); fliperama(-11.45, 4.75);
-  putC('lampRoundFloor', -11.3, 8.4, 0); putC('lampSquareFloor', -6.0, 8.4, 0);
+  SOFA = putC('loungeSofaLong', -8.4, 8.3, Math.PI); SOFA2 = putC('loungeSofa', -11.25, 6.1, Math.PI / 2); putC('loungeChairRelax', -6.45, 8.15, Math.PI + .25);
+  pingPong(-8.05, 5.9); pebolim(-10.6, 4.55); fliperama(-11.45, 8.35);
+  putC('lampRoundFloor', -9.85, 8.65, 0); putC('lampSquareFloor', -5.45, 8.6, 0);
 
-  { const tv = putC('televisionModern', -8.4, 4.25, Math.PI); }
-  plantAt(-6.0, 4.3, 'plantSmall2', K * 1.4); plantAt(-11.4, 4.9, 'pottedPlant');
+  { const rack = rbox(1.6, .45, .45, .04, mat(0x5e412d, { roughness: .5 })); rack.position.set(-8.05, .225, 3.75); scene.add(rack); const tv = putC('televisionModern', -8.05, 3.75, 0, K, .45); }
+  plantAt(-6.0, 4.0, 'plantSmall2', K * 1.4);
   const ls = sign('RECREAÇÃO', '#c9a2ff', 1.9, .48); ls.position.set(-8.4, 2.75, 3.42); scene.add(ls);
   { const gm = new THREE.MeshPhysicalMaterial({ color: 0xe6d2ff, transparent: true, opacity: .07, roughness: .05, depthWrite: false, envMapIntensity: .12, side: THREE.DoubleSide }), rail = mat(0xdfe5ff, { metalness: .5, roughness: .3 });
     const a = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 2.6), gm); a.position.set(-W / 2 + 3.3, 1.3, 3.4); a.userData.noAO = true; scene.add(a);
@@ -382,7 +382,7 @@ function buildOffice() {
     for (const xx of [x0, x1]) { const r = rbox(.06, .05, z1 - z0, .02, rail); r.position.set(xx, 2.4, (z0 + z1) / 2); scene.add(r); }
     const tbl = rbox(3.2, .06, 1.3, .25, mat(0x8a6a4e, { roughness: .45 })); tbl.position.set(-.5, .74, 6.6); scene.add(tbl);
     const leg = rbox(.12, .72, .9, .04, deskLeg); leg.position.set(-.5, .36, 6.6); scene.add(leg);
-    for (const cx of [-1.6, -.5, .6]) { putC('chairModernFrameCushion', cx, 5.6, Math.PI) || putC('chairCushion', cx, 5.6, Math.PI); putC('chairModernFrameCushion', cx, 7.6, 0) || putC('chairCushion', cx, 7.6, 0); }
+    for (const cx of [-1.6, -.5, .6]) { putC('chairModernFrameCushion', cx, 5.6, 0) || putC('chairCushion', cx, 5.6, 0); putC('chairModernFrameCushion', cx, 7.6, Math.PI) || putC('chairCushion', cx, 7.6, Math.PI); }
     const lap = putC('laptop', -1.1, 6.5, .4, K, .77);
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.0), new THREE.MeshBasicMaterial({ map: news[1], toneMapped: false })); scr.position.set(-.5, 1.5, 8.75); scr.rotation.y = Math.PI; scene.add(scr);
     plantAt(2.2, 8.4, 'plantSmall1', K * 1.4);
@@ -396,16 +396,16 @@ function buildOffice() {
     boardTex = canvasTex(1024, 512, () => { });
     const b = rbox(4.2, 1.9, .1, .05, mat(0x5a3d2a)); b.position.set(7.6, 1.45, 1.6); scene.add(b);
     const s = new THREE.Mesh(new THREE.PlaneGeometry(3.95, 1.7), new THREE.MeshStandardMaterial({ map: boardTex, roughness: .9, emissive: 0xffffff, emissiveMap: boardTex, emissiveIntensity: .25 })); s.position.set(7.6, 1.45, 1.66); scene.add(s);
-    STUDENT_POS.forEach(([x, z]) => { const t = putC('desk', x, z - .55, Math.PI); if (t) STUDENT_DESK_Y = new THREE.Box3().setFromObject(t).max.y; });
+    STUDENT_POS.forEach(([x, z], i) => { const t = putC('desk', x, z - .55, Math.PI); if (t) STUDENT_DESK_Y = new THREE.Box3().setFromObject(t).max.y; putC('laptop', x + (i % 2 ? .25 : -.25), z - .62, Math.PI, K, STUDENT_DESK_Y); if (i >= STATE.escola.length) chairAt(x, z + .1, Math.PI); });
     putC('bookcaseOpen', 11.6, 5.4, -Math.PI / 2); plantAt(11.3, 8.3); plantAt(4.5, 8.4, 'plantSmall3', K * 1.4);
     const es = sign('ESCOLA', '#8fe6ff', 1.4, .35); es.position.set(7.6, 2.75, 1.4); scene.add(es);
     warm(7.6, 2.6, 4.6, 0x8fe6ff, 5, 9); }
 
   // entrada: cabideiro, plantas, lixeiras
-  putC('coatRack', 11.4, 1.0, 0); plantAt(-11.3, -8.3); plantAt(3.9, -8.3, 'plantSmall1', K * 1.4); plantAt(-5.9, -8.3, 'plantSmall2', K * 1.4); plantAt(-11.3, -1.2);
+  plantAt(-11.3, -8.3); plantAt(3.9, -8.3, 'plantSmall1', K * 1.4); plantAt(-5.9, -8.3, 'plantSmall2', K * 1.4); plantAt(-11.3, -1.2);
   putC('trashcan', -2.8, 3.1, 0);
   // árvore de natal na entrada do lounge
-  { const tree = new THREE.Group(); tree.position.set(-4.8, 0, 8.3);
+  { const tree = new THREE.Group(); tree.position.set(-4.3, 0, 8.25); tree.scale.setScalar(.84);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.08, .1, .4, 10), mat(0x7a4a2a)); trunk.position.y = .2; tree.add(trunk);
     [[.75, 1.0, .6], [.6, .85, 1.2], [.42, .7, 1.75]].forEach(([r, h, y]) => { const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 24), mat(0x1f9e64, { roughness: .7 })); c.position.y = y; c.castShadow = true; tree.add(c); });
     for (let i = 0; i < 24; i++) { const a = i * 2.4, y = .35 + i * .065, r = .72 - i * .026; bulbAt(Math.cos(a) * r, y, Math.sin(a) * r, i, tree); }
@@ -535,7 +535,7 @@ function shellGeo(g, kind, o) {
   const mask = i => { const x = C.getX(i), y = C.getY(i), z = C.getZ(i), py = Q.getY(i);
     if (kind === 'top') return (x + (long ? y : 0)) + (jacket && z > .3 && py > -.24 ? 1 : 0);
     return py > hem - .12 ? z : 0; };
-  const keep = []; for (let t = 0; t < ix.length; t += 3) { const s = mask(ix[t]) + mask(ix[t + 1]) + mask(ix[t + 2]); if (s > 1.5) keep.push(ix[t], ix[t + 1], ix[t + 2]); }
+  const keep = []; for (let t = 0; t < ix.length; t += 3) { const s = mask(ix[t]) + mask(ix[t + 1]) + mask(ix[t + 2]); if (s > .9) keep.push(ix[t], ix[t + 1], ix[t + 2]); }
   if (!keep.length) return SHELL[key] = null;
   const map = new Map(), order = []; const idx = keep.map(v => { if (!map.has(v)) { map.set(v, order.length); order.push(v); } return map.get(v); });
   const out = new THREE.BufferGeometry(), N = order.length;
@@ -562,12 +562,13 @@ function shellGeo(g, kind, o) {
 function shellMat(col, kind, o) {
   const m = new THREE.MeshStandardMaterial({ color: col, roughness: .8, metalness: 0, envMapIntensity: .3, side: THREE.DoubleSide });
   const jacket = kind === 'top' && o.inner !== undefined;
-  const U = { uVBot: { value: o.vbot ?? .42 }, uJ: { value: jacket ? 1 : 0 }, uBeltS: { value: kind === 'pants' && o.belt !== false && o.hem === undefined && !jacket ? 1 : 0 }, uK: { value: kind === 'top' ? 1 : 0 }, uHemS: { value: kind === 'pants' ? (o.hem ?? -9) : jacket ? -.16 : -9 } };
+  const U = { uVBot: { value: o.vbot ?? .42 }, uJ: { value: jacket ? 1 : 0 }, uBeltS: { value: kind === 'pants' && o.belt !== false && o.hem === undefined && !jacket ? 1 : 0 }, uK: { value: kind === 'top' ? 1 : 0 }, uHemS: { value: kind === 'pants' ? (o.hem ?? -9) : jacket ? -.16 : -9 }, uLongS: { value: o.long === false ? 0 : 1 } };
   m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 bp; attribute vec4 cloth; varying vec3 vB; varying vec4 vC;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvB = bp; vC = cloth;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vB; varying vec4 vC; uniform float uVBot, uJ, uBeltS, uK, uHemS;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vB; varying vec4 vC; uniform float uVBot, uJ, uBeltS, uK, uHemS, uLongS;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         if (vB.y < uHemS) discard;
+        { float mk = uK > .5 ? vC.x + vC.y * uLongS + (uJ > .5 && vC.z > .3 && vB.y > -.24 ? 1. : 0.) : (vB.y > uHemS - .12 ? vC.z : 0.); if (mk < .5) discard; }
         if (uJ > .5 && vB.z > .0) {
           float cut = uVBot - .17 - vB.y; if (cut > 0. && abs(vB.x) < cut * .2) discard;
           float k = clamp((vB.y - uVBot) / (.67 - uVBot), 0., 1.), hw = .006 + k * .07;
@@ -674,7 +675,7 @@ const ORDER_LEGS = [
   { pts: [[-8, .8], [-8.2, -.6], [-7.6, -2.4]], stop: 'rui', face: [-8, -4.2] },
   { pts: [[-7.6, -2.4], [-6.2, -.4], [-4.5, .55]], stop: 'rocha', face: [-4.5, 1.4] },
   { pts: [[-4.5, .55], [-2.7, .3], [-1, .55]], stop: 'vera', face: [-1, 1.4] },
-  { pts: [[-1, .55], [2.5, -.6], [6.2, -1.6], [8.7, -2.2]], stop: 'cofre', face: [10.6, -2.2] },
+  { pts: [[-1, .55], [1.5, .4], [3.7, -.5], [6.4, -.45], [8.7, -2.2]], stop: 'cofre', face: [10.6, -2.2] },
   { pts: [[8.7, -2.2], [5.5, -.4], [0, .1], [-6, .1], [-8, .8]], stop: 'home', face: null },
 ].map(l => ({ ...l, c: curve(l.pts) , L: 0 })); ORDER_LEGS.forEach(l => l.L = l.c.getLength());
 const CAT_C = curve([[-9.6, .3], [-3, .15], [3.6, .3], [3.6, 2.9], [-3, 3.0], [-9.6, 2.9]], true);
@@ -780,7 +781,7 @@ function drawWall(t) {
   for (let i = 0; i < Math.min(6, nn); i++) { const it = NEWS[(ini + i) % nn], y = top + 70 + i * 62; g.fillStyle = i === 0 ? 'rgba(255,210,94,.12)' : 'rgba(255,255,255,.03)'; g.beginPath(); g.roundRect(1396, y - 30, 618, 56, 10); g.fill();
     g.fillStyle = '#ffd25e'; g.font = '700 20px "JetBrains Mono", monospace'; g.fillText(it.h, 1410, y + (it.fonte ? -4 : 4));
     if (it.fonte) { g.fillStyle = 'rgba(255,210,94,.75)'; g.font = '600 15px Inter, sans-serif'; let fo = it.fonte; while (g.measureText(fo).width > 72 && fo.length > 3) fo = fo.slice(0, -1); g.fillText(fo, 1410, y + 18); }
-    g.fillStyle = i === 0 ? '#fff' : '#cfd4ff'; g.font = `${i === 0 ? 700 : 500} 21px Inter, sans-serif`; const L = 510, ws = it.txt.split(' '); let l1 = '', l2 = '';
+    g.fillStyle = i === 0 ? '#fff' : '#cfd4ff'; g.font = `${i === 0 ? 700 : 500} 21px Inter, sans-serif`; const L = 470, ws = it.txt.split(' '); let l1 = '', l2 = '';
     for (const w of ws) { if (!l2 && g.measureText(l1 + w).width < L) l1 += w + ' '; else l2 += w + ' '; }
     if (l2) { g.font = `${i === 0 ? 700 : 500} 18px Inter, sans-serif`; l1 = ''; l2 = ''; for (const w of ws) { if (!l2 && g.measureText(l1 + w).width < L) l1 += w + ' '; else l2 += w + ' '; } while (g.measureText(l2).width > L && l2.length > 4) l2 = l2.slice(0, -3) + '…'; g.fillText(l1.trim(), 1490, y - 6); g.fillText(l2.trim(), 1490, y + 17); }
     else g.fillText(l1.trim(), 1490, y + 4); }
@@ -832,9 +833,9 @@ function startOrder(txt, tk) { if (!actors.nico) return; if (order) return; { co
     const i = Math.max(0, STATE.traders.findIndex(t => t.key === tk)); tk = STATE.traders[i] ? STATE.traders[i].key : 'rui';
     const tp = TRADER_POS[i] || TRADER_POS[0], [sx, sz] = atrasDe(tp), [ex, ez] = SALA.entrada, R1 = TEAM_POS[1];
     const L0 = ORDER_LEGS[0], L1 = ORDER_LEGS[1], LH = ORDER_LEGS[ORDER_LEGS.length - 1];
-    L0.c = curve([[h.x, h.z], [h.x + .7, h.z - .35], [h.x + 1.3, .25], [.8, .25], [ex, ez], [ex, sz], [sx, sz]]); L0.L = L0.c.getLength(); L0.face = tp; L0.stop = tk;
-    L1.c = curve([[sx, sz], [ex, sz], [ex, ez], [.8, .25], [R1[0], .55]]); L1.L = L1.c.getLength();
-    LH.c = curve([[8.7, -2.2], [5.5, -.4], [0, .1], [-6, .1], [h.x + .75, h.z - .4], [h.x + .45, h.z]]); LH.L = LH.c.getLength(); } order = { phase: 'standup', leg: 0, d: 0, until: simT + 1.4, txt: txt || null }; play(actors.nico, 'StandUp', .25, { hold: true }); coin.visible = true; document.querySelectorAll('.steps li').forEach(l => l.classList.remove('done')); }
+    L0.c = curve([[h.x, h.z], [h.x + .7, h.z - .35], [h.x + 1.3, .3], [1.4, .35], [2.45, -.15], [2.45, ez], [2.45, sz], [(2.45 + sx) / 2, sz], [sx, sz]]); L0.L = L0.c.getLength(); L0.face = tp; L0.stop = tk;
+    L1.c = curve([[sx, sz], [(2.45 + sx) / 2, sz], [2.45, sz], [2.45, ez], [2.45, -.15], [1.4, .35], [R1[0] + 1.2, .45], [R1[0], .55]]); L1.L = L1.c.getLength();
+    LH.c = curve([[8.7, -2.2], [6.4, -.3], [3.6, -.3], [1.5, .4], [-6, .3], [h.x + .75, h.z - .4], [h.x + .45, h.z]]); LH.L = LH.c.getLength(); } order = { phase: 'standup', leg: 0, d: 0, until: simT + 1.4, txt: txt || null }; play(actors.nico, 'StandUp', .25, { hold: true }); coin.visible = true; document.querySelectorAll('.steps li').forEach(l => l.classList.remove('done')); }
 function markStep(...ks) { ks.forEach(k => document.getElementById('st' + k)?.classList.add('done')); }
 function updateOrder(t, dt) {
   const nico = actors.nico; if (!order || !nico) return; const u = nico.userData;
@@ -919,23 +920,23 @@ async function main() {
   // gente pelo escritório: bebedouro, impressora, lounge e sala de reunião
   const npc = (k, nome, papel, fala) => { const p = mk(k); p.userData.info = { kind: 'npc', key: k, nome, papel, fala }; clickables.push(p); return p; };
   { const p = npc('ana', 'Ana', 'do financeiro', 'Água geladinha, melhor coisa.'); p.position.set(6.4, 0, -7.7); p.rotation.y = p.userData.yaw = Math.PI; p.userData.cycle = ['Idle', 4, 'Drink', 0, 'Talk', 3]; play(p, 'Idle', 0, { offset: 1 }); }
-  { const p = npc('paulo', 'Paulo', 'do suporte', 'A impressora voltou a funcionar!'); p.position.set(5.2, 0, -.85); p.rotation.y = p.userData.yaw = Math.PI; p.userData.cycle = ['Interact', 0, 'Idle', 3, 'Phone', 6]; play(p, 'Idle', 0); }
-  { const p = npc('mari', 'Mari', 'do marketing', 'Esse sofá é o melhor lugar da firma.'); seat(p, -7.3, 8.25, Math.PI, .4); sitPose(p); }
-  { const p = npc('leo', 'Léo', 'do design', 'Pausa de cinco minutos e já volto.'); seat(p, -8.05, 8.25, Math.PI, .4); sitPose(p); }
+  { const p = npc('paulo', 'Paulo', 'do suporte', 'A impressora voltou a funcionar!'); p.position.set(5.95, 0, -1.6); p.rotation.y = p.userData.yaw = -Math.PI / 2; p.userData.cycle = ['Interact', 0, 'Idle', 3, 'Phone', 6]; play(p, 'Idle', 0); }
+  { const p = npc('mari', 'Mari', 'do marketing', 'Esse sofá é o melhor lugar da firma.'); const sb = new THREE.Box3().setFromObject(SOFA); seat(p, sb.min.x + (sb.max.x - sb.min.x) * .74, sb.min.z + (sb.max.z - sb.min.z) * .52, Math.PI, .4); sitPose(p); }
+  { const p = npc('leo', 'Léo', 'do design', 'Pausa de cinco minutos e já volto.'); const sb = new THREE.Box3().setFromObject(SOFA2); seat(p, sb.max.x - (sb.max.x - sb.min.x) * .52, (sb.min.z + sb.max.z) / 2, Math.PI / 2, .4); sitPose(p); }
   { const p = npc('gui', 'Gui', 'gerente de operações', 'Precisamos revisar o risco da semana.'); seat(p, -.5, 5.6, 0); sitPose(p); }
   { const p = npc('ju', 'Ju', 'compliance', 'Tudo registrado e auditado.'); seat(p, -.5, 7.6, Math.PI); sitPose(p); }
   labels.push(label3d('Escola', 'estratégias em prova', '#8fe6ff', new THREE.Vector3(7.6, 2.9, 1.6)));
   labels.push(label3d('Corretora', 'modo simulado', '#ffd25e', new THREE.Vector3(10.6, 2.9, -2.2)));
   // café servido na mesa: Caio e Rita pegam na copa, entram pela porta da sala e servem cada trader
   const bandeja = () => { const cup = new THREE.Group(); const tray = new THREE.Mesh(new RoundedBoxGeometry(.42, .025, .3, 2, .01), mat(0x6b4a2a)); cup.add(tray); [[-.1, -.06], [.1, -.06], [0, .07]].forEach(([cx, cz]) => { const k = new THREE.Mesh(new THREE.CylinderGeometry(.04, .033, .09, 14), mat(0xffffff)); k.position.set(cx, .055, cz); k.castShadow = true; cup.add(k); }); scene.add(cup); return cup; };
-  [['cafe', [8.2, -7.3], 0, 0], ['rita', [9.15, -7.3], 1, 7]].forEach(([k, copa, par, espera]) => { const c = k === 'cafe' ? actors.cafe : mk('rita');
+  [['cafe', [7.45, -7.55], 0, 0], ['rita', [9.15, -7.3], 1, 7]].forEach(([k, copa, par, espera]) => { const c = k === 'cafe' ? actors.cafe : mk('rita');
     c.position.set(copa[0], 0, copa[1]); c.rotation.y = c.userData.yaw = Math.PI; play(c, 'Idle', 0); c.userData.cup = bandeja();
     c.userData.garcom = { copa, par, fase: 'pegar', ate: espera + 2.5, alvo: par, c: null, d: 0, L: 1 }; garcons.push(c);
     c.userData.info = k === 'cafe' ? { kind: 'cafe' } : { kind: 'npc', key: 'rita', nome: 'Rita', papel: 'copeira, serve café na mesa', fala: 'Cafezinho saindo!' }; clickables.push(c); });
   // recreação: partida de pingue-pongue
   [['pedro', 'Pedro', 'da TI', -1], ['bruna', 'Bruna', 'do RH', 1]].forEach(([k, nome, papel, lado]) => { const p = npc(k, nome, papel, lado < 0 ? 'Valendo o cafezinho!' : 'Essa foi na quina!');
     p.position.set(ping.x0 + lado * 1.85, 0, ping.z); p.rotation.y = p.userData.yaw = -lado * Math.PI / 2; play(p, 'Interact', 0); p.userData.ping = lado;
-    const rq = new THREE.Group(); const cab = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .012, 18), mat(lado < 0 ? 0xc0282d : 0x1b1b1f)); cab.rotation.x = Math.PI / 2; cab.position.y = .1; rq.add(cab); const pega = rbox(.03, .1, .02, .008, mat(0x9a6b3a)); rq.add(pega); p.userData.bones.hand_r.add(rq); rq.scale.setScalar(1 / p.userData.model.scale.x); });
+    const rq = new THREE.Group(); const cab = new THREE.Mesh(new THREE.CylinderGeometry(.075, .075, .012, 18), mat(lado < 0 ? 0xc0282d : 0x1b1b1f)); cab.rotation.x = Math.PI / 2; cab.position.y = .1; rq.add(cab); const pega = rbox(.03, .1, .02, .008, mat(0x9a6b3a)); rq.add(pega); const hb = p.userData.bones.hand_l; hb.add(rq); p.updateMatrixWorld(true); const ws = hb.getWorldScale(new THREE.Vector3()); rq.scale.setScalar(1 / ws.x); rq.position.set(0, .06 / ws.x, 0); });
   cat.userData.info = { kind: 'cat' }; clickables.push(cat);
 
   renderer.domElement.addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; const r = renderer.domElement.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
@@ -958,9 +959,9 @@ async function main() {
 const clock = new THREE.Clock(); let scrIdx = 0; const tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3();
 const garcons = [];
 function rotaGarcom(c, i) { const g = c.userData.garcom, tp = TRADER_POS[i] || TRADER_POS[0], [sx, sz] = atrasDe(tp), [ex, ez] = SALA.entrada;
-  const pts = [g.copa, [7.0, -7.2], [6.75, -5.6], [4.3, -2.7], [3.7, -1.05], [ex, ez], [ex, sz], [sx - .05, sz]]; return { ida: curve(pts), volta: curve(pts.slice().reverse()), tp }; }
+  const pts = [g.copa, [6.95, -6.9], [6.75, -5.6], [4.4, -2.8], [3.75, -1.1], [2.9, -1.0], [2.9, sz], [(2.9 + sx) / 2, sz], [sx - .05, sz]]; return { ida: curve(pts), volta: curve(pts.slice().reverse()), tp }; }
 function atualizarGarcom(c, t, dt) { const g = c.userData.garcom, u = c.userData;
-  if (g.fase === 'pegar' && t >= g.ate) { const n = Math.max(1, TRADER_POS.length); g.alvo = (g.alvo + 2) % n; if (n === 1) g.alvo = 0; g.rota = rotaGarcom(c, g.alvo); g.c = g.rota.ida; g.L = g.c.getLength(); g.d = 0; g.fase = 'ida'; play(c, 'Walk_Carry', .3, { timeScale: 1.4 }); }
+  if (g.fase === 'pegar' && t >= g.ate && !order) { const n = Math.max(1, TRADER_POS.length); g.alvo = (g.alvo + 2) % n; if (n === 1) g.alvo = 0; g.rota = rotaGarcom(c, g.alvo); g.c = g.rota.ida; g.L = g.c.getLength(); g.d = 0; g.fase = 'ida'; play(c, 'Walk_Carry', .3, { timeScale: 1.4 }); }
   else if (g.fase === 'ida' || g.fase === 'volta') { g.d = Math.min(g.L, g.d + CARRY_SPEED * 1.4 * dt); const f = g.d / g.L, q = g.c.getPointAt(f), tg = g.c.getTangentAt(Math.min(.999, f));
     c.position.set(q.x, 0, q.z); u.yaw = lerpAngle(u.yaw, Math.atan2(tg.x, tg.z), Math.min(1, dt * 6)); c.rotation.y = u.yaw;
     if (g.d >= g.L) { if (g.fase === 'ida') { g.fase = 'servir'; g.ate = t + 2.6; g.falou = false; play(c, 'Interact', .3, { once: true }); } else { g.fase = 'pegar'; g.ate = t + 3 + (g.par ? 1.5 : 0); play(c, 'Interact', .3, { once: true }); } } }
@@ -968,7 +969,9 @@ function atualizarGarcom(c, t, dt) { const g = c.userData.garcom, u = c.userData
     if (!g.falou && t > g.ate - 1.4) { g.falou = true; const tr = STATE.traders[g.alvo]; if (tr && actors[tr.key]) say(actors[tr.key], ['Valeu!', 'Obrigado!', 'Salvou meu dia.', 'Bem forte, por favor.'][Math.floor(t) % 4], 1.6); }
     if (t >= g.ate) { g.fase = 'volta'; g.c = g.rota.volta; g.L = g.c.getLength(); g.d = 0; play(c, 'Walk_Carry', .3, { timeScale: 1.4 }); } }
   if (g.fase === 'pegar') { u.yaw = lerpAngle(u.yaw, Math.PI, Math.min(1, dt * 5)); c.rotation.y = u.yaw; }
-  const B = u.bones; B.hand_l.getWorldPosition(tmpV); B.hand_r.getWorldPosition(tmpV2); u.cup.position.copy(tmpV).add(tmpV2).multiplyScalar(.5); u.cup.position.y += .02; u.cup.rotation.y = u.yaw; }
+  if (g.fase === 'ida' || g.fase === 'volta') { const B = u.bones; B.hand_l.getWorldPosition(tmpV); B.hand_r.getWorldPosition(tmpV2); u.cup.position.copy(tmpV).add(tmpV2).multiplyScalar(.5); u.cup.position.y += .02; }
+  else { u.cup.position.set(c.position.x + Math.sin(u.yaw) * .42, 1.02, c.position.z + Math.cos(u.yaw) * .42); }
+  u.cup.rotation.y = u.yaw; }
 function simulate(t, dt) {
   cidade.atualizar(t, dt);
   mixers.forEach(m => m.update(dt));
@@ -1001,7 +1004,7 @@ function simulate(t, dt) {
 }
 function updateLabels() {
   const w = app.clientWidth, h = app.clientHeight; const show = camera.position.distanceTo(controls.target) < 30;
-  labels.forEach(l => { tmpV2.copy(l.pos).applyMatrix4(camera.matrixWorldInverse); tmpV.copy(l.pos).project(camera); const vis = tmpV2.z < 0 && tmpV.z < 1 && show; l.el.style.opacity = vis ? 1 : 0; l.el.style.transform = `translate(-50%,-100%) translate(${(tmpV.x * .5 + .5) * w}px,${(-tmpV.y * .5 + .5) * h}px)`; });
+  labels.forEach(l => { tmpV2.copy(l.pos).applyMatrix4(camera.matrixWorldInverse); tmpV.copy(l.pos).project(camera); const vis = tmpV2.z < 0 && tmpV.z < 1 && show && (camera.position.distanceTo(controls.target) > 18 || l.pos.distanceTo(controls.target) < 7.5); l.el.style.opacity = vis ? 1 : 0; l.el.style.transform = `translate(-50%,-100%) translate(${(tmpV.x * .5 + .5) * w}px,${(-tmpV.y * .5 + .5) * h}px)`; });
   const now = performance.now() / 1000;
   for (let i = bubbles.length - 1; i >= 0; i--) { const b = bubbles[i]; if ((!REC && now > b.until) || (REC && simT > b.untilT)) { b.el.remove(); bubbles.splice(i, 1); continue; }
     tmpV.copy(b.actor.position); tmpV.y += 1.9; tmpV.project(camera); b.el.style.transform = `translate(-50%,-100%) translate(${(tmpV.x * .5 + .5) * w}px,${(-tmpV.y * .5 + .5) * h - 30}px)`; }
