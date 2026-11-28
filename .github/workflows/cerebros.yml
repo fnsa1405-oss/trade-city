@@ -36,10 +36,10 @@ jobs:
             ln -s "$RUNNER_TEMP/dados-intraday/dados" dados
           fi
           WT="$RUNNER_TEMP/cerebros"
-          if git fetch --depth=1 origin cerebros; then
-            git worktree add -B cerebros "$WT" FETCH_HEAD
+          if git fetch --depth=1 origin cerebros-treinados; then
+            git worktree add -B cerebros-treinados "$WT" FETCH_HEAD
           else
-            git worktree add --orphan -b cerebros "$WT"
+            git worktree add --orphan -b cerebros-treinados "$WT"
           fi
           mkdir -p "$WT/cerebros"
 
@@ -58,7 +58,7 @@ jobs:
           if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
           git commit -q -m "cérebros: treino $(date -u +%Y-%m-%d)"
           for i in 1 2 3 4; do
-            git push origin cerebros && exit 0
+            git push origin cerebros-treinados && exit 0
             sleep $((i * 5))
           done
           exit 1

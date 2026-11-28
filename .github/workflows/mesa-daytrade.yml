@@ -36,7 +36,7 @@ jobs:
 
       - name: Carregar os cérebros
         run: |
-          if git fetch --depth=1 origin cerebros; then
+          if git fetch --depth=1 origin cerebros-treinados; then
             git archive FETCH_HEAD cerebros | tar -x || echo "sem cérebros salvos"
             ls cerebros 2>/dev/null || true
           else
