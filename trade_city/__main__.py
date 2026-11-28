@@ -322,6 +322,7 @@ def main(argv: list[str] | None = None) -> None:
     con.add_argument("--dias", type=int, default=2900, help="dias de histórico das criptos")
     con.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     con.add_argument("--json", help="salva o relatório em JSON (para o app e o escritório 3D)")
+    con.add_argument("--dados", default="dados", help="pasta com os candles guardados pelo coletor")
     flh = sub.add_parser("fluxo-historico", help="baixa/atualiza o histórico de fluxo das criptos (Binance, grátis)")
     flh.add_argument("--pasta", default="fluxo")
     flh.add_argument("--desde", default="2017-01-01")
@@ -506,9 +507,13 @@ def main(argv: list[str] | None = None) -> None:
         def fetch(t):
             print(f"conselho: baixando {t.symbol} ({t.timeframe})...", flush=True)
             try:
-                if t.asset_class is AssetClass.CRYPTO:
-                    return public_bars(t.symbol, t.asset_class, t.timeframe, args.dias)
-                return public_bars(t.symbol, t.asset_class, t.timeframe, 3650)
+                if t.day_trade:  # candles guardados pela coleta (+ Massive), como na escola
+                    from .history import intraday_history
+
+                    return intraday_history(t.symbol, t.timeframe, args.dados)
+                from .carteira import _bars_for  # fluxo de cripto vem da Binance, com o volume de agressão
+
+                return _bars_for(t, args.dias)
             except Exception as exc:
                 print(f"  aviso: {t.symbol} falhou: {exc}", flush=True)
                 return []

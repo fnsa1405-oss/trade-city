@@ -372,10 +372,22 @@ def portfolio_curve(reports: dict[str, BacktestReport], weights: dict[str, float
     return equity, dd
 
 
+def _bt(trader: TraderProfile, bars, risk: RiskConfig | None = None, **kw) -> BacktestReport:
+    """Backtest igual ao da escola: day trade de índices sempre em microcontratos."""
+    if trader.day_trade and "contract" not in kw:
+        from .futures import MICROS
+
+        kw["contract"] = MICROS.get(trader.symbol)
+    return run_backtest(trader, bars, risk or RiskConfig(), **kw)
+
+
 def trials_for(trader: TraderProfile) -> int:
     """Quantas combinações a escola testou até escolher a estratégia deste trader."""
-    from .school import CANDIDATES, RISK_VARIANTS, SWING_SETUPS
+    from .school import CANDIDATES, DAY_CANDIDATES, DAY_RISK_VARIANTS, RISK_VARIANTS, SWING_SETUPS
 
+    if trader.day_trade:
+        pairs = sum(1 for c in DAY_CANDIDATES for rv in DAY_RISK_VARIANTS if not (rv.reward_ratio >= 10 and not c.make().has_exit))
+        return pairs * 3  # gatilho de 1, 5 e 15 min
     if trader.asset_class is AssetClass.CRYPTO:
         cands, tfs = CANDIDATES, 3
     else:
@@ -482,14 +494,17 @@ def review_iris(dossiers: Sequence[Dossier]) -> Opinion:
     for d in dossiers:
         q = data_quality(d.bars, d.trader.asset_class)
         bad = q["duplicados"] + q["impossíveis"]
-        if bad or q["buracos"] > 0.01 * q["candles"] or q["saltos"]:
+        if bad or q["buracos"] > 0.01 * q["candles"] or q["saltos"] > 0.005 * q["candles"]:
             op.findings.append(Finding(ATENCAO if not bad else ALERTA, f"dados de {d.trader.symbol} ({d.trader.timeframe}): {q['candles']} candles, {q['buracos']} buracos, {q['duplicados']} duplicados, {q['impossíveis']} impossíveis, {q['saltos']} saltos fora do normal", d.trader.key))
         else:
-            op.findings.append(Finding(OK, f"dados de {d.trader.symbol} limpos ({q['candles']} candles, {q['buracos']} buracos)", d.trader.key))
+            op.findings.append(Finding(OK, f"dados de {d.trader.symbol} ({d.trader.timeframe}) limpos: {q['candles']} candles, {q['buracos']} buracos, {q['saltos']} movimentos extremos (reais, como quedas de crise)", d.trader.key))
         if d.report is None:
             continue
         rets = trade_returns(d.report)
         n = trials_for(d.trader)
+        if len(rets) < 10:
+            op.findings.append(Finding(ATENCAO, f"{d.trader.name}: só {len(rets)} operações no histórico que o conselho consegue baixar ({len(d.bars)} candles). Pouco para medir; quem decide é a escola dele.", d.trader.key))
+            continue
         sr, sr0, prob = deflated_sharpe(rets, n)
         level = OK if prob >= 0.95 else ATENCAO if prob >= 0.5 else ALERTA
         op.findings.append(Finding(
@@ -500,7 +515,8 @@ def review_iris(dossiers: Sequence[Dossier]) -> Opinion:
         ))
         if weakest is None or prob < weakest[1]:
             weakest = (d.trader.name, prob, len(rets))
-        op.proposals.append(school_duel(d.trader, d.bars, lambda: WeakSignalVote(), "Votação de sinais fracos"))
+        if not d.trader.day_trade:  # as propostas são de swing; o day trade tem escola própria
+            op.proposals.append(school_duel(d.trader, d.bars, lambda: WeakSignalVote(), "Votação de sinais fracos"))
     if weakest:
         op.speech = f"A vantagem de {weakest[0]} ainda pode ser sorte ({weakest[1]:.0%} de confiança, {weakest[2]} operações)." if weakest[1] < 0.95 else "Os números dos traders estão estatisticamente sólidos."
     return op
@@ -514,8 +530,11 @@ def review_otto(dossiers: Sequence[Dossier], factors: dict[str, list[Bar]]) -> O
         if r:
             last = max(r)
             rets[key] = {k: v for k, v in r.items() if (last - k).days <= 365}
-    keys = list(rets)
     names = {d.trader.key: d.trader.name for d in dossiers}
+    short = [k for k, r in rets.items() if len(r) < 60]
+    if short:
+        op.findings.append(Finding(ATENCAO, f"{', '.join(names[k] for k in short)}: menos de 60 dias de histórico baixado, ficam fora da conta de correlação.", None))
+    keys = [k for k in rets if k not in short]
     matrix = [[1.0 if a == b else (correlation(rets[a], rets[b]) or 0.0) for b in keys] for a in keys]
     eff = effective_bets(matrix) if keys else 0.0
     if keys:
@@ -599,18 +618,21 @@ def review_heitor(dossiers: Sequence[Dossier]) -> Opinion:
         if d.report is not None and d.report.trades:
             k = kelly_multiple(trade_returns(d.report))
             if k > 0:
-                op.findings.append(Finding(OK, f"{d.trader.name}: o Kelly cheio seria {k:.1f}x o tamanho atual (meio Kelly {k / 2:.1f}x). Seguimos no tamanho atual, que é mais conservador.", d.trader.key))
+                kt = f"{k:.1f}x" if k < 10 else "mais de 10x"
+                op.findings.append(Finding(OK, f"{d.trader.name}: o Kelly cheio seria {kt} o tamanho atual. Seguimos no tamanho atual, bem abaixo de meio Kelly.", d.trader.key))
             else:
-                op.findings.append(Finding(ALERTA, f"{d.trader.name}: Kelly negativo no histórico inteiro (a média das operações é negativa).", d.trader.key))
+                stop = f" (o histórico parou na trava de queda em {d.report.halted_at:%d/%m/%Y})" if d.report.halted_at else ""
+                op.findings.append(Finding(ALERTA, f"{d.trader.name}: Kelly negativo, a média das operações no histórico é negativa{stop}.", d.trader.key))
             fee = 0.002 if d.trader.asset_class is AssetClass.CRYPTO else 0.0
-            stress = run_backtest(replace(d.trader, strategy=copy.deepcopy(d.trader.strategy)), d.bars, RiskConfig(), fee_pct=fee, slippage_pct=0.0015)
+            stress = _bt(replace(d.trader, strategy=copy.deepcopy(d.trader.strategy)), d.bars, fee_pct=fee, slippage_pct=0.0015)
             pf0, pf1 = d.report.profit_factor, stress.profit_factor
             level = OK if pf1 >= 1.1 and stress.total_pnl > 0 else ALERTA
             op.findings.append(Finding(level, f"{d.trader.name} com custo dobrado e derrapagem triplicada: fator de lucro {_fmt_pf(pf0)} → {_fmt_pf(pf1)}.", d.trader.key))
             if level == ALERTA:
                 notes.append(d.trader.name)
         lookback = 20 if hl == math.inf else min(60, max(5, round(hl)))
-        op.proposals.append(school_duel(d.trader, d.bars, lambda n=lookback: ZScoreReversion(n, 2.0), f"Reversão por z-score ({lookback} candles)"))
+        if not d.trader.day_trade:  # as propostas são de swing; o day trade tem escola própria
+            op.proposals.append(school_duel(d.trader, d.bars, lambda n=lookback: ZScoreReversion(n, 2.0), f"Reversão por z-score ({lookback} candles)"))
     op.speech = f"O lucro de {', '.join(notes)} some se o custo subir." if notes else "Os traders aguentam custo dobrado. Seguimos com menos de meio Kelly."
     return op
 
@@ -623,7 +645,7 @@ def review_lia(dossiers: Sequence[Dossier]) -> Opinion:
     op.findings.append(Finding(ATENCAO, "Falta um analista de notícias e sentimento. Fica como pendência: precisa de uma fonte gratuita com histórico longo para passar pela escola.", None))
     bears = 0
     for d in dossiers:
-        if len(d.bars) < 210:
+        if len(d.bars) < 210 or d.trader.day_trade:
             continue
         bull = bull_case(d.bars)
         bear = bear_case(d.bars)[-1]
@@ -635,7 +657,8 @@ def review_lia(dossiers: Sequence[Dossier]) -> Opinion:
             d.trader.key,
         ))
         strat = d.trader.strategy
-        op.proposals.append(school_duel(d.trader, d.bars, lambda s=strat: BearFilter(copy.deepcopy(s), 3), "Veto do urso (3+ argumentos contra)"))
+        if not d.trader.day_trade:  # as propostas são de swing; o day trade tem escola própria
+            op.proposals.append(school_duel(d.trader, d.bars, lambda s=strat: BearFilter(copy.deepcopy(s), 3), "Veto do urso (3+ argumentos contra)"))
     op.speech = f"O urso está vencendo o debate em {bears} de {len(dossiers)} ativos." if bears else "O touro vence o debate na maioria dos ativos."
     return op
 
@@ -651,7 +674,7 @@ def review_rafa(dossiers: Sequence[Dossier]) -> Opinion:
             continue
         runs = {}
         for label, prof in neighbors(d.trader):
-            runs[label] = d.report if label == "atual" else run_backtest(prof, d.bars, RiskConfig())
+            runs[label] = d.report if label == "atual" else _bt(prof, d.bars)
         good = [k for k, r in runs.items() if r.profit_factor >= 1.1 and r.total_pnl > 0]
         share = len(good) / len(runs)
         worst = min(runs.items(), key=lambda kv: kv[1].profit_factor if kv[1].trades else 0)
@@ -766,6 +789,6 @@ def build_dossiers(traders: Sequence[TraderProfile], fetch) -> list[Dossier]:
         bars = fetch(t)
         if not bars:
             continue
-        report = run_backtest(replace(t, strategy=copy.deepcopy(t.strategy)), bars, risk_for(t, RiskConfig())) if len(bars) > 300 else None
+        report = _bt(replace(t, strategy=copy.deepcopy(t.strategy)), bars) if len(bars) > 300 else None
         out.append(Dossier(t, bars, report))
     return out

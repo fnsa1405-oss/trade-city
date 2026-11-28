@@ -10,6 +10,7 @@ on:
     paths:
       - "trade_city/conselho.py"
       - "trade_city/strategies/conselho.py"
+      - "trade_city/__main__.py"
       - ".github/workflows/conselho.yml"
   workflow_dispatch:
 
@@ -32,7 +33,18 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
+      - name: Abrir os candles guardados pela coleta
+        run: |
+          if git fetch --depth=1 origin dados-intraday; then
+            git worktree add -B dados-intraday "$RUNNER_TEMP/dados-intraday" FETCH_HEAD
+            ln -s "$RUNNER_TEMP/dados-intraday/dados" dados
+          else
+            echo "ainda não há candles guardados"
+          fi
+
       - name: Reunião do conselho
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
         run: |
           python -m trade_city conselho --saida conselho.md --json conselho.json
           cat conselho.md >> "$GITHUB_STEP_SUMMARY"
