@@ -112,6 +112,11 @@ class Desk:
             else:
                 return []
 
+        # mercado fechado: o candle fica para ser analisado na abertura (como no backtest,
+        # que entra na abertura do candle seguinte), em vez de ser descartado
+        if trader.asset_class is not AssetClass.CRYPTO and not self.broker.is_market_open(trader.asset_class):
+            return []
+
         # 1. Analista: uma decisão por candle fechado
         last_key = f"last_bar:{trader.key}"
         bar_id = bars[-1].ts.isoformat()

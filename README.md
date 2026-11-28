@@ -15,13 +15,13 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Trader | Ativo | Tempo gráfico | Estratégia | Situação |
 | --- | --- | --- | --- | --- |
 | Rui Xis (`rui`) | XRP/USD | 4h | Donchian em conjunto (Zarattini/Pagani/Barbon), stop 2 ATR | aprovado na escola |
-| Teo Chip (`teo`) | QQQ (Nasdaq 100) | day trade, gatilho 1 min | ORB 15 min, alvo 2x | na escola (o cérebro tenta filtrar) |
-| Dona Lena (`lena`) | SPY (S&P 500) | day trade, gatilho 5 min | ORB 15 min, alvo 3x | na escola (o cérebro tenta filtrar) |
+| Teo Chip (`teo`) | QQQ (Nasdaq 100) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 1,42) |
+| Dona Lena (`lena`) | SPY (S&P 500) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovada em 28/11/2026 (prova: fator de lucro 1,59) |
 | Bia Satoshi (`bia`) | BTC/USD | - | - | na escola |
 | Edu Éter (`edu`) | ETH/USD | - | - | na escola |
 | Sol Ventura (`sol`) | SOL/USD | - | - | na escola |
 | Dora Doge (`dora`) | DOGE/USD | - | - | na escola |
-| Davi Dow (`davi`) | DIA (Dow Jones) | day trade, gatilho 5 min | ORB 15 min, alvo 3x | na escola (o cérebro tenta filtrar) |
+| Davi Dow (`davi`) | DIA (Dow Jones) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 2,21) |
 | Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade, gatilho 1 min | ORB 5 min, alvo 2x | na escola (o cérebro tenta filtrar) |
 
 Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova (27/11/2026). A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
@@ -135,6 +135,8 @@ Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 
 | IFR2 | Stormer (Larry Connors no original) | A favor do 60 min, compra com IFR2 < 5 e sai com IFR2 > 70 | [SmarttBot](https://smarttbot.com/assets/data/Ebook-IFR2) |
 | Falha de estrutura (2B) | Victor Sperandeo | 15 min em tendência de Dow; o gatilho perde o último fundo e volta; entra a favor | [Bulkowski](https://www.thepatternsite.com/2B.html) |
 | Fibonacci 38-62% | retração clássica | 60 e 15 min a favor; recuo à zona de 38,2-61,8% do último impulso; stop em 78,6% | [Investopedia](https://www.investopedia.com/terms/f/fibonacciretracement.asp) |
+
+**Swing nos índices:** os mesmos setups também rodam em swing (60 min e diário, pode dormir posicionado). A confluência passa a ser o tempo gráfico de cima: o diário para o 60 min e o semanal para o diário. Para testar: Actions > Escola > modo `swing`.
 
 Nos gatilhos de 5 e 15 min, a escola confere entrada, stop e alvo minuto a minuto com os candles de 1 min. Sem isso, num candle que fez a mínima e depois rompeu a máxima, não dá para saber se o stop veio antes da entrada.
 

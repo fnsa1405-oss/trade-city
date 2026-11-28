@@ -203,6 +203,7 @@ def main(argv: list[str] | None = None) -> None:
     bt.add_argument("--salvar", help="salva os candles baixados neste CSV")
     esc = sub.add_parser("escola", help="testa várias estratégias e tempos gráficos por trader")
     esc.add_argument("trader", nargs="?", default="todos")
+    esc.add_argument("--modo", choices=["normal", "swing"], default="normal", help="swing = testa os índices também em swing (60 min e diário)")
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     esc.add_argument("--dados", default="dados", help="pasta com os candles guardados pelo coletor")
@@ -268,6 +269,21 @@ def main(argv: list[str] | None = None) -> None:
                 note = ""
                 if trader.asset_class is AssetClass.CRYPTO:
                     series = timeframes_for(trader, public_bars(trader.symbol, trader.asset_class, "1h", args.dias), "1h")
+                elif trader.day_trade and args.modo == "swing":
+                    from dataclasses import replace as _replace
+
+                    from .school import CANDIDATES, SWING_SETUPS
+
+                    swing = _replace(trader, day_trade=False)
+                    series = {
+                        "1d": public_bars(trader.symbol, trader.asset_class, "1d", max(args.dias, 3650)),
+                        "1h": public_bars(trader.symbol, trader.asset_class, "1h", 729),
+                    }
+                    note = "Modo swing: pode dormir posicionado; confluência com o tempo gráfico de cima.\n"
+                    section = report_markdown(swing, evaluate(swing, series, candidates=CANDIDATES + SWING_SETUPS)) + note
+                    print(section, flush=True)
+                    parts.append(section)
+                    continue
                 elif trader.day_trade:
                     from .history import DAY_TIMEFRAMES, intraday_history
 

@@ -124,3 +124,38 @@ def test_desk_arms_stop_order_and_enters_on_break():
     events = desk.run_once()
     assert any("rompeu" in e for e in events), events
     assert desk.ledger.open_trade_for("davi") is not None
+
+
+def daily_bars(n=600, seed=4):
+    import random
+
+    rng = random.Random(seed)
+    out, price, d = [], 100.0, datetime(2020, 1, 6, 16, tzinfo=NY)
+    while len(out) < n:
+        if d.weekday() < 5:
+            o = price
+            price *= 1 + 0.0004 + rng.gauss(0, 0.01)
+            out.append(Bar(d.astimezone(timezone.utc), o, max(o, price) * 1.004, min(o, price) * 0.996, price, 1e6))
+        d += timedelta(days=1)
+    return out
+
+
+def test_swing_setups_hold_overnight_and_use_weekly_context():
+    from dataclasses import replace
+
+    from trade_city.intraday import Timeline
+    from trade_city.school import SWING_SETUPS
+    from trade_city.strategies.setups import _upper
+
+    bars = daily_bars()
+    up = _upper(Timeline.build(bars))
+    assert 115 <= len(up.bars) <= 125  # semanas
+    assert up.done_at[0] == 0  # a semana em andamento ainda não conta
+    multi_day = 0
+    for cand in SWING_SETUPS:
+        strat = cand.make()
+        assert not strat.day_trade and "swing" in strat.name
+        trader = replace(day_trader(strat), day_trade=False, timeframe="1d")
+        rep = run_backtest(trader, bars, RiskConfig())
+        multi_day += sum(t.closed_at.date() != t.opened_at.date() for t in rep.trades)
+    assert multi_day > 0
