@@ -31,11 +31,28 @@ export async function loadState() {
   // a montagem da sala (quem senta onde) vem do estado.json; os números vêm da mesa de verdade
   let s = window.__ESTADO;
   try { const r = await fetch('estado.json', { cache: 'no-store' }); if (r.ok) s = await r.json(); } catch (e) {}
-  try { const vivo = await obterAoVivo(); if (vivo) aplicarAoVivo(s, vivo, true); } catch (e) { console.warn('mesa ao vivo:', e); }
+  try { const vivo = await obterAoVivo(); if (vivo) { montarElenco(s, vivo); aplicarAoVivo(s, vivo, true); } } catch (e) { console.warn('mesa ao vivo:', e); }
   return s;
 }
 
 /* ================= mesa ao vivo ================= */
+const CORES = ['#3fb6f2', '#7b6cff', '#d38cff', '#ff6fcf', '#ffd84d', '#3ddc97', '#ffb547', '#8f9bff', '#ff7a45'];
+// quem senta na mesa e quem fica na escola segue a mesa de verdade (lido uma vez, ao abrir)
+function montarElenco(s, vivo) {
+  if (!vivo.elenco || !vivo.elenco.length) return;
+  const base = {}; [...s.traders, ...s.escola].forEach(p => base[p.key] = p);
+  const naMesa = (vivo.traders || []).map(t => t.key).filter((k, i, a) => a.indexOf(k) === i).slice(0, 6);
+  const ficha = (e, i) => { const b = base[e.key] || {}; return { ...b, key: e.key, nome: e.nome, ativo: e.ativo, cor: b.cor || CORES[i % CORES.length], pf_escola: b.pf_escola || 0, humor: b.humor || 'normal', vitorias: 0, derrotas: 0, capital: b.capital || 10000, posicao: 'nenhuma', fala: b.fala || 'Foco no plano.', estrategia: b.estrategia || '' }; };
+  const porKey = Object.fromEntries(vivo.elenco.map(e => [e.key, e]));
+  s.traders = naMesa.map((k, i) => ficha(porKey[k] || { key: k, nome: k, ativo: '' }, i));
+  s.escola = vivo.elenco.filter(e => !naMesa.includes(e.key)).slice(0, STUDENT_POS.length).map((e, i) => ({ ...ficha(e, i + 3), ativo: e.ativo.split('/')[0], status: 'estudando' }));
+  // fileira de mesas: até 3 no espaço original; com mais gente, 6 lugares de -9 a 6
+  const n = s.traders.length;
+  const lugares = n <= 3 ? [[-8, -4.2], [-4.5, -4.2], [-1, -4.2], [2.5, -4.2]] : [-9, -6, -3, 0, 3, 6].map(x => [x, -4.2]);
+  TRADER_POS.splice(0, TRADER_POS.length, ...lugares.slice(0, n));
+  VAGA_POS.splice(0, VAGA_POS.length, ...(lugares.length > n ? [lugares[n]] : []));
+}
+
 const ETAPA_ATOR = { analista: null, 'cérebro': null, 'guardião': 'rocha', auditor: 'vera', placar: null };
 const fmtP = v => v == null ? '–' : v.toLocaleString('pt-BR', { minimumFractionDigits: v < 10 ? 4 : 2, maximumFractionDigits: v < 10 ? 4 : 2 });
 const fmtR = v => (v > 0 ? '+' : v < 0 ? '−' : '') + 'US$ ' + Math.abs(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -243,7 +260,7 @@ function sign(text, color, w, h) { const t = canvasTex(512, 128, (g, W, Hh) => {
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, toneMapped: false, depthWrite: false })); }
 
 /* ---------- layout ---------- */
-const TRADER_POS = [[-8, -4.2], [-4.5, -4.2], [-1, -4.2]];
+const TRADER_POS = [[-8, -4.2], [-4.5, -4.2], [-1, -4.2]]; // reorganizado por montarElenco conforme a mesa real
 const VAGA_POS = [[2.5, -4.2]];
 const TEAM_POS = [[-8, 1.4], [-4.5, 1.4], [-1, 1.4]];
 const STUDENT_POS = [[6.2, 4.2], [8.8, 4.2], [6.2, 6.6], [8.8, 6.6]];
@@ -660,15 +677,16 @@ function drawWall(t) {
   g.fillStyle = '#3dff9a'; g.font = '800 40px Inter, sans-serif'; g.textAlign = 'left'; g.fillText('MESA SIMULADA', 34, 62);
   const blink = Math.sin(t * 4) > 0; g.fillStyle = blink ? '#ff4d6d' : '#5a1a2a'; g.beginPath(); g.arc(W - 150, 48, 12, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 28px Inter, sans-serif'; g.fillText('AO VIVO', W - 128, 58);
   g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '500 22px Inter, sans-serif'; g.fillText(STATE.aoVivo ? `hoje ${fmtR(STATE.hoje)} · meta ${STATE.regras.meta_vitorias} vitórias · trava ${STATE.regras.trava_derrotas} derrotas` : `dia ${STATE.dia} de ${STATE.dias_total} · meta ${STATE.regras.meta_vitorias} vitórias · trava ${STATE.regras.trava_derrotas} derrotas`, 34, 98);
-  STATE.traders.forEach((tr, i) => { const y = 150 + i * 66; g.fillStyle = 'rgba(255,255,255,.05)'; g.beginPath(); g.roundRect(28, y - 40, W - 56, 56, 14); g.fill();
-    g.fillStyle = tr.cor; g.beginPath(); g.arc(60, y - 12, 12, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 30px Inter, sans-serif'; g.fillText(tr.nome, 86, y);
-    g.fillStyle = '#a9b0e0'; g.font = '500 24px "JetBrains Mono", monospace'; g.fillText(tr.ativo.split(' ')[0], 330, y); g.fillStyle = tr.situacao === 'na escola' ? '#ffe08a' : '#6fd3ff'; g.fillText(tr.situacao === 'na escola' ? 'escola' : tr.humor, 520, y); g.fillStyle = '#cfd4ff'; g.fillText(`${tr.vitorias}V ${tr.derrotas}D`, 680, y); g.fillStyle = '#3dff9a'; g.fillText('$' + tr.capital.toLocaleString('pt-BR'), 830, y); });
+  const n = Math.max(1, STATE.traders.length), st = Math.min(66, (H - 118) / n), fs = Math.round(Math.min(30, st * .5)), fm = Math.round(Math.min(24, st * .42));
+  STATE.traders.forEach((tr, i) => { const y = 118 + st * (i + .72); g.fillStyle = 'rgba(255,255,255,.05)'; g.beginPath(); g.roundRect(28, y - st * .62, W - 56, st - 6, 12); g.fill();
+    g.fillStyle = tr.cor; g.beginPath(); g.arc(60, y - fs * .35, Math.min(12, fs * .4), 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = `700 ${fs}px Inter, sans-serif`; g.fillText(tr.nome, 86, y);
+    g.fillStyle = '#a9b0e0'; g.font = `500 ${fm}px "JetBrains Mono", monospace`; g.fillText(tr.ativo.split(' ')[0], 330, y); g.fillStyle = tr.situacao === 'na escola' ? '#ffe08a' : '#6fd3ff'; g.fillText(tr.situacao === 'na escola' ? 'escola' : tr.humor, 520, y); g.fillStyle = '#cfd4ff'; g.fillText(`${tr.vitorias}V ${tr.derrotas}D`, 680, y); g.fillStyle = '#3dff9a'; g.fillText('$' + tr.capital.toLocaleString('pt-BR'), 830, y); });
   wallTex.needsUpdate = true;
 }
 function drawBoard() { const { g, c } = boardTex.userData; const W = c.width, H = c.height; g.fillStyle = '#1f5f4c'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#f4f1e6'; g.font = '700 46px "Bricolage Grotesque", sans-serif'; g.textAlign = 'center'; g.fillText('PROVA: fator de lucro ≥ 1,3', W / 2, 80); g.font = '600 34px Inter, sans-serif'; g.textAlign = 'left';
   const naMesa = STATE.traders.filter(t => t.situacao !== 'na escola'), estudando = [...STATE.traders.filter(t => t.situacao === 'na escola').map(t => ({ nome: t.nome, ativo: t.ativo.split(' ')[0] })), ...STATE.escola];
-  naMesa.forEach((t, i) => { g.fillStyle = '#9dffcf'; g.fillText(STATE.aoVivo ? `✓ ${t.nome}` : `✓ ${t.nome}  ${t.pf_escola.toFixed(2).replace('.', ',')}`, 70, 170 + i * 56); });
+  naMesa.forEach((t, i) => { g.fillStyle = '#9dffcf'; g.fillText(STATE.aoVivo ? `✓ ${t.nome}` : `✓ ${t.nome}  ${t.pf_escola.toFixed(2).replace('.', ',')}`, 70, 170 + i * Math.min(56, 320 / Math.max(1, naMesa.length))); });
   estudando.forEach((s, i) => { g.fillStyle = '#ffe08a'; g.fillText(`○ ${s.nome} (${s.ativo})`, 560, 170 + i * 46); });
   g.fillStyle = 'rgba(244,241,230,.7)'; g.font = '500 28px Inter, sans-serif'; g.fillText('aprovados', 70, 130); g.fillText('estudando', 560, 130); boardTex.needsUpdate = true; }
 const bubbles = [];
@@ -755,6 +773,8 @@ const CAST = {
   gui: { file: M, hairs: ['SlickBack', 'Beard'], shirt: 0x2a2c33, pants: 0x2a2c33, inner: W_, tie: 0x1a1a1f, shoes: SH, hair: 0x1e1612, skin: SKIN[1], height: 1.80, seed: 15, talky: true },
   ju: { file: F, hairs: [], longHair: 'medio', glasses: true, shirt: 0x1c1d22, pants: 0x1c1d22, inner: W_, vbot: .36, shoes: SH, hair: 0x3a2418, brow: 0x3a2418, skin: SKIN[1], height: 1.67, seed: 16, talky: true },
   paulo: { file: M, hairs: ['SimpleParted'], shirt: 0x7b7f87, pants: 0x7b7f87, inner: W_, tie: 0x2c4a86, shoes: 0x3a2416, hair: 0x2a1c14, skin: SKIN[1], height: 1.76, seed: 17 },
+  davi: { file: M, hairs: ['Balding', 'Moustache'], glasses: true, shirt: 0x2d3340, pants: 0x2d3340, inner: W_, tie: 0x6b1f2a, shoes: SH, hair: 0x8a8a8a, skin: SKIN[0], height: 1.77, seed: 18 },
+  ivo: { file: M, hairs: ['Buzzed'], shirt: 0x3b4a6b, pants: 0x1c1d22, shoes: 0xf2f2f2, hair: 0x2a1c14, skin: SKIN[3], height: 1.74, seed: 19 },
   cafe: { file: M, hairs: ['SlickBack'], shirt: 0x1c1d22, pants: 0x1c1d22, inner: W_, tie: 0x141416, shoes: SH, hair: 0x2a1c14, skin: SKIN[1], height: 1.78, seed: 11 },
 };
 
@@ -771,12 +791,12 @@ async function main() {
   await Promise.all(list.map(async f => { SRC[f] = await loadPerson(f); prog(.2 + .8 * (++done / list.length)); }));
   for (const f of ['UAL1_Standard', 'UAL2_Standard']) SRC[f].animations.forEach(a => ANIMS[a.name] = a);
   for (const f of list) if (f.startsWith('Hair_')) HAIR[f.slice(5)] = SRC[f];
-  const mk = k => { const p = makePerson(SRC[CAST[k].file], CAST[k]); actors[k] = p; return p; };
+  const mk = k => { const c = CAST[k] || { ...CAST.edu, seed: 40 + Object.keys(actors).length }; const p = makePerson(SRC[c.file], c); actors[k] = p; return p; };
   WALK_SPEED = measureWalkSpeed(mk('cafe')); CARRY_SPEED = measureWalkSpeed(actors.cafe, 'Walk_Carry');
   STATE.traders.forEach((tr, i) => { const [x, z] = TRADER_POS[i]; desk(x, z - 1.0, 0, { seed: i + 1, label: tr.ativo.split(' ')[0] }); chairAt(x, z - .28, Math.PI);
     const p = mk(tr.key); seat(p, x, z - .28, Math.PI); typeAt(p, x, .79, z - .7); p.userData.info = { kind: 'trader', d: tr }; clickables.push(p); labels.push(label3d(tr.nome, tr.ativo.split(' ')[0], tr.cor, new THREE.Vector3(x, 1.95, z))); });
   VAGA_POS.forEach(([x, z], i) => { desk(x, z - 1.0, 0, { on: false, seed: 20 + i }); chairAt(x, z + .05, Math.PI); });
-  labels.push(label3d('Vaga', 'para quem passar na escola', '#ffd25e', new THREE.Vector3(2.5, 1.7, -5.2)));
+  VAGA_POS.forEach(([x, z]) => labels.push(label3d('Vaga', 'para quem passar na escola', '#ffd25e', new THREE.Vector3(x, 1.7, z - 1))));
   STATE.equipe.forEach((m, i) => { const [x, z] = TEAM_POS[i]; desk(x, z + 1.0, Math.PI, { seed: 30 + i, col: '#c9a2ff', label: m.papel.split(' ')[0].toUpperCase() }); chairAt(x, z + .28, 0);
     const p = mk(m.key); seat(p, x, z + .28, 0); typeAt(p, x, .79, z + .7); p.userData.info = { kind: 'team', d: m }; clickables.push(p); labels.push(label3d(m.nome, m.papel, m.cor, new THREE.Vector3(x, 1.95, z))); });
   STATE.escola.forEach((s, i) => { const [x, z] = STUDENT_POS[i]; chairAt(x, z + .1, Math.PI);

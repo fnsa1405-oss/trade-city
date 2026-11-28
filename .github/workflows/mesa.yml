@@ -5,6 +5,8 @@ name: Mesa simulada
 # na corretora simulada, com preços reais e dinheiro de mentira.
 # O GitHub só agenda de hora em hora com segurança, então cada rodada é um turno de ~55 min
 # com um ciclo por minuto. Livro e estado do app são salvos a cada 2 minutos.
+# O agendador do GitHub não chegou a disparar neste repositório (27-28/11), então cada turno
+# chama o próximo no final; o grupo de concorrência garante um turno por vez.
 # O livro de registros (trade_city.db) e o placar ficam salvos no branch "mesa-dados".
 # Para ver pelo celular: o app (pasta app/, publicado no GitHub Pages) lê o estado.json deste branch.
 # O botão de pânico do app grava o branch "controle"; a mesa confere antes de cada rodada.
@@ -15,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: mesa
@@ -87,3 +90,9 @@ jobs:
         if: always()
         run: |
           bash .github/scripts/salvar-mesa.sh trade_city.db "$RUNNER_TEMP/mesa-dados" "mesa: rodada" estado.json placar.txt
+
+      - name: Chamar o próximo turno
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mesa.yml --ref main -R "$GITHUB_REPOSITORY"
