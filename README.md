@@ -115,7 +115,7 @@ Estratégias atuais de cripto (pesquisa de 27/11/2026, `trade_city/strategies/cr
 
 ### Escola de day trade (QQQ, SPY, DIA, IWM)
 
-Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 min confirma e o gatilho sai no candle de 5 ou 1 minuto (a escola testa os dois). Opera comprado e vendido, o stop vem do gráfico (fundo ou topo do gatilho), não abre nada depois das 15h e zera tudo às 15h50 de Nova York. Custo: 0,01% por lado (spread e corretagem de ETF líquido).
+Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 min confirma e o gatilho sai no candle de 15, 5 ou 1 minuto (a escola testa os três). Opera comprado e vendido, o stop vem do gráfico (fundo ou topo do gatilho), não abre nada depois das 15h e zera tudo às 15h50 de Nova York. Custo: 0,01% por lado (spread e corretagem de ETF líquido).
 
 | Estratégia | Origem | Regra | Fonte |
 | --- | --- | --- | --- |
@@ -124,6 +124,19 @@ Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 
 | Heikin-Ashi + MME 9/21 | Dan Valcu (HA) | 60 min com MME9 > MME21 e HA a favor, 15 min acima da MME21, gatilho na virada do HA após recuo, VWAP a favor | [Investopedia](https://www.investopedia.com/trading/heikin-ashi-better-candlestick/) |
 | Teoria de Dow em 3 tempos | Charles Dow | 60 e 15 min com topos e fundos a favor; gatilho no rompimento do último topo/fundo | [Investopedia](https://www.investopedia.com/terms/d/dowtheory.asp) |
 | Dow 60 min + gatilho Heikin-Ashi | combinação pedida | Tendência de Dow no 60 min, gatilho na virada do HA, VWAP a favor | - |
+
+**Setups de traders conhecidos** (só regras publicadas abertamente; versões "+ 60 min" só operam a favor da MME9 x MME21 do gráfico de 60 min). Entram por ordem stop: o setup arma no fechamento do candle e só entra se o preço romper a máxima (compra) ou a mínima (venda) dele.
+
+| Setup | Quem ensina | Regra | Fonte |
+| --- | --- | --- | --- |
+| 9.1, 9.2 e 9.3 | Larry Williams (popularizados no Brasil) | Virada da MME9 (9.1), recuo de 1 candle (9.2) ou 2 fechamentos contra (9.3) com a MME9 a favor; sai quando a MME9 vira | [TradingView](https://www.tradingview.com/script/z4ElukQB/) |
+| 123 | Stormer (Alexandre Wolwacz) | MME8 acima da MME80, fundo de 3 candles acima da MME8; stop no fundo | [TradingView](https://br.tradingview.com/script/r7dHB8Ir-J2S-Backtest-123-Stormer-Strategy) |
+| Ponto Contínuo | Stormer | MME21 subindo, toque na média com fechamento acima; sai ao fechar do outro lado | [TradingView](https://id.tradingview.com/script/9gJmFKz3-Continuous-Point-zauoyds) |
+| IFR2 | Stormer (Larry Connors no original) | A favor do 60 min, compra com IFR2 < 5 e sai com IFR2 > 70 | [SmarttBot](https://smarttbot.com/assets/data/Ebook-IFR2) |
+| Falha de estrutura (2B) | Victor Sperandeo | 15 min em tendência de Dow; o gatilho perde o último fundo e volta; entra a favor | [Bulkowski](https://www.thepatternsite.com/2B.html) |
+| Fibonacci 38-62% | retração clássica | 60 e 15 min a favor; recuo à zona de 38,2-61,8% do último impulso; stop em 78,6% | [Investopedia](https://www.investopedia.com/terms/f/fibonacciretracement.asp) |
+
+Nos gatilhos de 5 e 15 min, a escola confere entrada, stop e alvo minuto a minuto com os candles de 1 min. Sem isso, num candle que fez a mínima e depois rompeu a máxima, não dá para saber se o stop veio antes da entrada.
 
 Uma réplica independente do ORB com custos ([mql5, 2026](https://www.mql5.com/en/blogs/post/776235)) mostrou que a vantagem bruta quase some depois dos custos. Por isso a escola cobra custos e exige a prova fora da amostra.
 

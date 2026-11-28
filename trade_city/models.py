@@ -28,6 +28,8 @@ class Entry:
     reason: str
     side: Side = Side.LONG
     stop: float | None = None
+    trigger: float | None = None  # ordem stop: entra quando o preço romper este nível
+    valid_bars: int = 1  # por quantos candles a ordem stop vale
 
 
 @dataclass(frozen=True)

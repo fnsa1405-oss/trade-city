@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 
 from .auditor import AuditContext, Auditor
 from .broker import Broker
@@ -94,6 +95,23 @@ class Desk:
         if not bars:
             return []
 
+        # 0. ordem stop armada antes: entra se o preço romper o nível, cancela quando vence
+        pend_key = f"pending:{trader.key}"
+        raw = self.ledger.flag(pend_key)
+        if raw:
+            order = json.loads(raw)
+            side = Side(order["side"])
+            price = self.broker.latest_price(trader.symbol, trader.asset_class)
+            if now >= datetime.fromisoformat(order["expires"]):
+                self.ledger.set_flag(pend_key, "")
+                self.ledger.record_decision(now, trader.key, trader.symbol, "analista", False, "ordem stop venceu sem romper")
+            elif (price - order["trigger"]) * side.sign >= 0:
+                self.ledger.set_flag(pend_key, "")
+                signal = Signal(trader.key, trader.symbol, price, order["reason"], now, side, order["stop"])
+                return self._execute(trader, signal, bars, [f"[{trader.name}] rompeu {order['trigger']:.2f}: {order['reason']}"])
+            else:
+                return []
+
         # 1. Analista: uma decisão por candle fechado
         last_key = f"last_bar:{trader.key}"
         bar_id = bars[-1].ts.isoformat()
@@ -114,10 +132,22 @@ class Desk:
             if not ok:
                 return [f"[{trader.name}] cérebro deixou passar: {reason} ({detail})"]
             reason = f"{reason} (cérebro: {detail})"
-        price = self.broker.latest_price(trader.symbol, trader.asset_class)
-        signal = Signal(trader.key, trader.symbol, price, reason, now, decision.side, decision.stop)
         self.ledger.record_decision(now, trader.key, trader.symbol, "analista", True, reason)
         events = [f"[{trader.name}] sinal: {reason}"]
+        if decision.trigger is not None:
+            step = bars[-1].ts - bars[-2].ts if len(bars) > 1 else timedelta(minutes=5)
+            expires = bars[-1].ts + step * (1 + decision.valid_bars)
+            order = {"side": decision.side.value, "trigger": decision.trigger, "stop": decision.stop, "reason": reason, "expires": expires.isoformat()}
+            self.ledger.set_flag(pend_key, json.dumps(order))
+            verb = "compra acima de" if decision.side is Side.LONG else "venda abaixo de"
+            return events + [f"[{trader.name}] ordem stop armada: {verb} {decision.trigger:.2f}"]
+        price = self.broker.latest_price(trader.symbol, trader.asset_class)
+        signal = Signal(trader.key, trader.symbol, price, reason, now, decision.side, decision.stop)
+        return self._execute(trader, signal, bars, events)
+
+    def _execute(self, trader: TraderProfile, signal: Signal, bars, events: list[str]) -> list[str]:
+        """2. Guardião, 3. Auditor e 4. Execução."""
+        now = self.clock()
 
         # 2. Guardião de Risco
         stats = self.stats(trader)
