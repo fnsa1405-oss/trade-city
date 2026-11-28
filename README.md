@@ -136,6 +136,8 @@ Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 
 | Falha de estrutura (2B) | Victor Sperandeo | 15 min em tendência de Dow; o gatilho perde o último fundo e volta; entra a favor | [Bulkowski](https://www.thepatternsite.com/2B.html) |
 | Fibonacci 38-62% | retração clássica | 60 e 15 min a favor; recuo à zona de 38,2-61,8% do último impulso; stop em 78,6% | [Investopedia](https://www.investopedia.com/terms/f/fibonacciretracement.asp) |
 
+**Wyckoff** (apostila enviada pelo Alexandre em 28/11/2026, regras em `strategies/wyckoff.py`): spring/upthrust (com e sem volume baixo), SOS + LPS e clímax (SC/BC) com absorção. Faixa = máxima/mínima de 40 candles com altura até 6 ATR; barra larga = 1,8x a amplitude média; volume alto = 1,5x a média de 60 candles, ultra-alto = 2x. Ficaram de fora as partes subjetivas (rotular as fases A a E, linhas desenhadas à mão, Market Profile).
+
 **Swing nos índices:** os mesmos setups também rodam em swing (60 min e diário, pode dormir posicionado). A confluência passa a ser o tempo gráfico de cima: o diário para o 60 min e o semanal para o diário. Para testar: Actions > Escola > modo `swing`.
 
 Nos gatilhos de 5 e 15 min, a escola confere entrada, stop e alvo minuto a minuto com os candles de 1 min. Sem isso, num candle que fez a mínima e depois rompeu a máxima, não dá para saber se o stop veio antes da entrada.
