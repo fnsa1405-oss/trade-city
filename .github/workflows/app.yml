@@ -15,9 +15,10 @@ permissions:
   pages: write
   id-token: write
 
+# Várias frentes mexem no app: uma publicação nunca corta a outra no meio, a próxima espera.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   publicar:
@@ -33,5 +34,21 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app
-      - id: deploy
+      # O GitHub às vezes demora a enxergar o pacote recém-enviado ("No artifacts named
+      # github-pages"). Em vez de falhar, espera e tenta de novo.
+      - id: deploy1
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy1.outcome == 'failure'
+        run: sleep 30
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy2.outcome == 'failure'
+        run: sleep 60
+      - id: deploy3
+        if: steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+      - id: deploy
+        run: echo "page_url=${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy3.outputs.page_url }}" >> "$GITHUB_OUTPUT"
