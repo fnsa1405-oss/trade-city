@@ -1,0 +1,69 @@
+name: Conselho
+
+# Reunião do conselho de 5 consultores (trade_city/conselho.py). Revisa os traders aprovados
+# com os dados mais recentes e testa as propostas de cada consultor na escola, com as mesmas
+# regras. O relatório aparece no resumo da execução e, quando disparado pelo Relógio ou pelo
+# celular (Actions > Conselho > Run workflow), fica salvo no branch conselho-dados para o app
+# e o escritório 3D. O conselho só recomenda: nunca muda a mesa, as travas ou dinheiro real.
+on:
+  pull_request:
+    paths:
+      - "trade_city/conselho.py"
+      - "trade_city/strategies/conselho.py"
+      - ".github/workflows/conselho.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: conselho-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  conselho:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Reunião do conselho
+        run: |
+          python -m trade_city conselho --saida conselho.md --json conselho.json
+          cat conselho.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conselho
+          path: |
+            conselho.md
+            conselho.json
+
+      - name: Salvar no branch conselho-dados
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          WT="$RUNNER_TEMP/conselho"
+          if git fetch --depth=1 origin conselho-dados; then
+            git worktree add -B conselho-dados "$WT" FETCH_HEAD
+          else
+            git worktree add --orphan -b conselho-dados "$WT"
+          fi
+          cp conselho.md conselho.json "$WT/"
+          mkdir -p "$WT/historico"
+          cp conselho.md "$WT/historico/$(date -u +%Y-%m-%d).md"
+          cd "$WT"
+          git config user.name "trade-city-conselho"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A .
+          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+          git commit -q -m "conselho: revisão $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do
+            git push origin conselho-dados && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

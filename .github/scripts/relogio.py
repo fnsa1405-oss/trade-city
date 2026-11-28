@@ -26,6 +26,7 @@ AGENDA = [
     ("coleta.yml", 21, 20, WEEKDAYS, {}),
     ("cerebros.yml", 12, 0, (5,), {}),  # sábado
     ("escola.yml", 12, 0, (6,), {"trader": "todos", "dias": "2900"}),  # domingo: reconfere com os dados novos
+    ("conselho.yml", 15, 30, (6,), {}),  # domingo, depois da escola: revisão do conselho de consultores
 ]
 WINDOW = timedelta(minutes=15)  # atraso máximo aceito para um horário perdido
 REPO = os.environ.get("GITHUB_REPOSITORY", "")

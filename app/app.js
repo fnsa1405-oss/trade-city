@@ -9,6 +9,7 @@ const FONTES = {
   swing: `${RAW}/mesa-dados/estado.json`,
   day: `${RAW}/mesa-daytrade/estado.json`,
   trava: `${RAW}/controle/trava.txt`,
+  conselho: `${RAW}/conselho-dados/conselho.json`,
 };
 const PAGINA_PANICO = `https://github.com/${REPO}/actions/workflows/panico.yml`;
 const FUSO = "America/Sao_Paulo";
@@ -568,6 +569,67 @@ async function montarEscritorio() {
   }
 }
 
+// ------------------------------------------------------------------ conselho
+const NIVEL = { ok: "ok", "atenção": "atencao", alerta: "alerta" };
+const SITUACAO = {
+  recomendada: "recomendada",
+  melhorou: "recomendada",
+  reserva: "na reserva",
+  "não melhorou": "em observação",
+  reprovada: "reprovada na escola",
+  "sem dados": "sem dados",
+};
+let conselho = null;
+
+async function carregarConselho() {
+  try {
+    conselho = await buscar(FONTES.conselho);
+  } catch {
+    /* mantém a última reunião */
+  }
+  desenharConselho();
+}
+
+function desenharConselho() {
+  const box = $("#conselho");
+  if (!box || !conselho?.conselheiros?.length) return;
+  const quando = new Date(conselho.gerado_em);
+  $("#conselho-dica").textContent = `reunião de ${quando.toLocaleDateString("pt-BR", { timeZone: FUSO })}`;
+  box.replaceChildren();
+  for (const c of conselho.conselheiros) {
+    const recs = c.propostas.filter((p) => p.status === "recomendada" || p.status === "melhorou").length;
+    const card = el("details", "conselheiro");
+    const selo = c.alertas ? `<b class="selo alerta">${c.alertas} alerta${c.alertas > 1 ? "s" : ""}</b>` : `<b class="selo ok">tudo certo</b>`;
+    card.append(
+      el(
+        "summary",
+        "",
+        `<span class="mini">${esc(iniciais(c.nome))}</span>
+         <span class="c-txt"><strong>${esc(c.nome)}</strong><small>${esc(c.papel)}</small>
+         <em>“${esc(c.fala)}”</em></span>${selo}`,
+      ),
+    );
+    const corpo = el("div", "c-corpo");
+    corpo.append(el("p", "c-insp", `Inspiração: ${esc(c.inspirado_em)}`));
+    const lista = el("ul", "c-achados");
+    for (const f of c.achados) lista.append(el("li", `n-${NIVEL[f.level] || "ok"}`, esc(f.text)));
+    corpo.append(lista);
+    if (c.propostas.length) {
+      corpo.append(el("p", "c-sub", `Propostas (${recs} recomendada${recs === 1 ? "" : "s"})`));
+      const pl = el("ul", "c-propostas");
+      for (const p of c.propostas)
+        pl.append(el("li", `p-${p.status === "recomendada" || p.status === "melhorou" ? "sim" : "nao"}`, `<strong>${esc(p.title)}</strong> · ${esc(p.trader)} · ${esc(SITUACAO[p.status] || p.status)}<small>${esc(p.detail)}</small>`));
+      corpo.append(pl);
+    }
+    corpo.append(el("p", "c-sub", "Princípios"));
+    const pr = el("ul", "c-principios");
+    for (const t of c.principios) pr.append(el("li", "", esc(t)));
+    corpo.append(pr);
+    card.append(corpo);
+    box.append(card);
+  }
+}
+
 // ------------------------------------------------------------------ ciclo
 let ocupado = false;
 async function atualizarTudo() {
@@ -589,6 +651,8 @@ function iniciar() {
   desenhar();
   atualizarTudo();
   montarEscritorio();
+  carregarConselho();
+  setInterval(() => document.visibilityState === "visible" && carregarConselho(), 30 * 60_000);
   setInterval(() => document.visibilityState === "visible" && carregarEstado().then(desenhar), A_CADA.estado);
   setInterval(() => document.visibilityState === "visible" && carregarPrecos().then(desenhar), A_CADA.precos);
   setInterval(() => document.visibilityState === "visible" && carregarRodadas().then(() => (desenhar(), proximaRodada())), A_CADA.rodadas);
