@@ -16,6 +16,7 @@
     {"key": "vera", "nome": "Vera", "papel": "auditora", "cor": "#f2f4ff", "fala": "Placar ok, longe da trava. Liberado."}
   ],
   "escola": [
+    {"key": "levy", "nome": "Levy Pivô", "ativo": "MNQ", "cor": "#4fd1a5", "status": "estudando", "persona": "Pesquisador e disciplinado: um setup só, o Pivô no 2 min do Nasdaq (micro MNQ). Pensa em amostras, não em um trade.", "fala": "Quais critérios do modelo estão presentes? Sem critério, sem trade."},
     {"key": "bia", "nome": "Bia Satoshi", "ativo": "BTC", "cor": "#ffb547", "status": "estudando"},
     {"key": "edu", "nome": "Edu Éter", "ativo": "ETH", "cor": "#8f9bff", "status": "estudando"},
     {"key": "sol", "nome": "Sol Ventura", "ativo": "SOL", "cor": "#ff6fcf", "status": "estudando"},

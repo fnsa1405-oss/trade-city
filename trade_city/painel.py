@@ -111,6 +111,7 @@ def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int =
             "key": t.key,
             "nome": t.name,
             "ativo": t.symbol,
+            "persona": t.persona,
             "situacao": "na mesa" if t.key in ativos else "na escola",
         }
         for t in default_traders()

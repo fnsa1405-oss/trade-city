@@ -30,6 +30,7 @@ class Entry:
     stop: float | None = None
     trigger: float | None = None  # ordem stop: entra quando o preço romper este nível
     valid_bars: int = 1  # por quantos candles a ordem stop vale
+    target: float | None = None  # alvo do gráfico (ex.: projeção de Fibonacci); sem ele, o Guardião usa o reward_ratio
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,7 @@ class Signal:
     ts: datetime
     side: Side = Side.LONG
     stop: float | None = None  # stop sugerido pelo gráfico
+    target: float | None = None  # alvo sugerido pelo gráfico
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,7 @@ from .setups import (
 )
 from .trend import TrendFollower
 from .medias import MovingAverageTrend
+from .pivo import PivotV2
 from .wyckoff import WyckoffClimax, WyckoffSOSLPS, WyckoffSpring
 
 __all__ = [
@@ -59,6 +60,7 @@ __all__ = [
     "WyckoffSOSLPS",
     "WyckoffClimax",
     "MovingAverageTrend",
+    "PivotV2",
     "TimeSeriesMomentum",
     "TurnOfMonth",
     "IBSReversion",

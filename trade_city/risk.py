@@ -49,6 +49,11 @@ class Guardian:
             stop_distance = cfg.atr_stop_multiple * volatility
         stop = entry - sign * stop_distance
         take = entry + sign * cfg.reward_ratio * stop_distance
+        if signal.target is not None:
+            # alvo do gráfico, fixo na entrada (ex.: projeção de Fibonacci do Levy)
+            if (signal.target - entry) * sign <= 0:
+                return None, "o preço já passou do alvo do gráfico"
+            take = signal.target
         if stop <= 0 or take <= 0:
             return None, "stop ou alvo ficariam abaixo de zero"
 

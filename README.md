@@ -24,9 +24,20 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Davi Dow (`davi`) | DIA (Dow Jones) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 2,21) |
 | Mia Média (`mia`) | MYM (micro do Dow) | day trade, gatilho 2 min | Médias 200/50/20/9 empilhadas em 60/15/5 min + candle de força | aprovada em 28/11/2026 (prova: fator de lucro 1,34) |
 | Flora Fluxo (`flora`) | MES (micro do S&P 500) | day trade, gatilho 1 min | ORB 15 min com delta a favor, alvo 3x | aprovada em 28/11/2026 na escola de fluxo (prova: fator de lucro 1,23) |
+| Levy Pivô (`levy`) | MNQ (micro do Nasdaq) | day trade, gráfico de 2 min | Pivô v2 do dossiê dele: swing, rompimento por fechamento, reteste e gatilho; stop A; alvo na projeção de Fibonacci (61%) | na escola (reprovado em 28/11/2026: prova com fator de lucro 0,82) |
 | Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade, gatilho 1 min | ORB 5 min, alvo 2x | na escola (o cérebro tenta filtrar) |
 
 Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova em 27/11/2026; em 28/11/2026, com microcontratos, passaram Mia e Flora, que operam na Mesa day trade simulada. A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
+
+## Levy e o Pivô v2 (dossiê de 26/11/2026)
+
+Levy é um trader real de futuros do Nasdaq; o personagem segue o dossiê dele: um setup só, decisões objetivas, "sem critério, sem trade", pensa em amostras. O método está em `trade_city/strategies/pivo.py`, com cada regra do dossiê e cada premissa que precisou ser fixada (o que o dossiê não define ficou escrito no topo do arquivo). Ele usa as mesmas travas da casa, com duas diferenças: capital de US$25.000 (o tamanho da conta Flex 25K dele) e alvo mínimo de 0,5x o risco no Auditor (o alvo 1 dele rende ~1R; o piso de 1,5x cortaria o método inteiro). A escola dele testa só o Pivô (`school="pivo"`): 2 e 1 min, camadas 3 e 2, alvos 1, 2 e 3.
+
+Escola de 28/11/2026 (2 anos de 1 min do QQQ convertidos para o MNQ, só a sessão de Nova York; a da Ásia não tem histórico aqui):
+
+- Regra oficial (2 min, camada 3, alvo 1): reprovada. Treino com fator de lucro 0,79, parado pela trava de 10% em abril de 2025; prova 202 operações, fator 0,82, -8,3%.
+- Nenhuma das 12 combinações passou no treino.
+- Aplicando as regras escritas em todos os padrões (1.889 em 2 anos): acerto de 57% no alvo 1 com ganho médio de 0,65R, expectativa de -0,05R antes dos custos e -0,09R depois. No mesmo período do backtest dele (09/11/2025 a 06/01/2026, Nova York) apareceram 104 padrões (ele marcou 103), com 56% de acerto e ganho médio de 0,73R, contra 62% e ~1R dele. A diferença está no que ainda não está escrito: onde ancorar a projeção e quais swings contam.
 
 ## Fluxo de ordens (order flow)
 

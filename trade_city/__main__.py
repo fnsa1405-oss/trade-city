@@ -364,8 +364,14 @@ def main(argv: list[str] | None = None) -> None:
                 section = report_markdown(trader, evaluate(trader, series, fine=series.get("1min"))) + note
                 if trader.approved and getattr(trader.strategy, "uses_flow", False):
                     section += "Estratégia atual é de fluxo de ordens: conferida na Escola de fluxo (dados da Binance).\n"
-                elif trader.approved:
+                elif trader.approved or trader.school:
+                    # método próprio (Levy): a regra oficial dele também é conferida sozinha
                     section += current_check(trader, series, fine=series.get("1min"))
+                if trader.school == "pivo":
+                    section += (
+                        "Pivô v2 do Levy: candles do QQQ no pregão regular convertidos para o micro MNQ; "
+                        "a sessão da Ásia (22h às 0h de Brasília) não tem histórico aqui e não foi testada.\n"
+                    )
             except Exception as exc:  # um ativo com problema não derruba os outros
                 section = f"### {trader.name} ({trader.symbol})\n\nErro ao testar: {exc}\n"
             print(section, flush=True)
