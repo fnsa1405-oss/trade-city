@@ -59,12 +59,13 @@ jobs:
           AGORA=$(TZ=America/New_York date +%H%M)
           if [ "$AGORA" -lt 1240 ]; then FIM=12:45; else FIM=16:01; fi
           echo "rodada até $FIM de Nova York"
-          python -m trade_city --db mesa_day.db --grupo day rodar --loop 60 --desde 09:29 --ate "$FIM" | tee rodada.txt
+          python -m trade_city --db mesa_day.db --grupo day rodar --loop 60 --desde 09:29 --ate "$FIM" --trava-git controle:trava.txt | tee rodada.txt
 
       - name: Placar
         if: always()
         run: |
           python -m trade_city --db mesa_day.db --grupo day placar > placar.txt
+          python -m trade_city --db mesa_day.db --grupo day painel --mesa day --saida estado.json
           {
             echo "## Rodada de day trade"
             echo '```'
@@ -81,11 +82,11 @@ jobs:
         run: |
           WT="$RUNNER_TEMP/mesa-daytrade"
           [ -f mesa_day.db ] || exit 0
-          cp mesa_day.db placar.txt "$WT/"
+          cp mesa_day.db placar.txt estado.json "$WT/"
           cd "$WT"
           git config user.name "trade-city-mesa"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f mesa_day.db placar.txt
+          git add -f mesa_day.db placar.txt estado.json
           if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
           git commit -q -m "day trade: rodada $(date -u +%Y-%m-%dT%H:%MZ)"
           for i in 1 2 3 4; do

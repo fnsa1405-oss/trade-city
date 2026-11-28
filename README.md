@@ -26,6 +26,17 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 
 Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova (27/11/2026). A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
 
+## App da mesa ao vivo (celular)
+
+A pasta `app/` é um app web instalável (PWA), publicado no GitHub Pages pelo workflow **Publicar o app**:
+https://fnsa1405-oss.github.io/trade-city/ (no celular: menu do navegador > *Adicionar à tela inicial*).
+
+- Lê o `estado.json` que cada rodada da mesa grava nos branches `mesa-dados` e `mesa-daytrade` (`python -m trade_city painel`).
+- Preço ao vivo das criptos pela Coinbase (a cada 10 s) e o resultado em aberto das posições.
+- Feed com cada passo da linha de produção (analista, cérebro, guardião, auditor, placar) e das rodadas no GitHub Actions.
+- **Botão de pânico**: dispara o workflow **Botão de pânico** (`panico.yml`), que grava a ordem no branch `controle` e trava a mesa swing na hora. A mesa de day trade confere a ordem a cada minuto do pregão. Sem chave, o botão abre a página do workflow; com uma chave *fine-grained* (só Actions, só este repositório) salva em *Ajustes*, dispara em um toque.
+- O escritório 3D entra no topo do app: ver `app/escritorio/LEIAME.md`.
+
 ## Cérebros (rede neural de cada trader)
 
 `python -m trade_city cerebros` (ou **Actions** > **Treino dos cérebros**, todo sábado) dá a cada trader uma rede neural pequena (`trade_city/brain.py`). A estratégia continua achando as oportunidades. O cérebro olha o clima do gráfico na hora (tendência, volatilidade, distância das médias, IFR, volume, horário, lado) e estima a chance de dar certo. Abaixo do limite, o trader deixa passar.
