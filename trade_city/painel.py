@@ -25,7 +25,7 @@ def _preco(x: float | None) -> float | None:
     return round(float(x), 6 if abs(x) < 10 else 2)
 
 
-def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int = 30, n_eventos: int = 40) -> dict:
+def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int = 30, n_eventos: int = 40, n_dias: int = 30) -> dict:
     now = now or datetime.now(timezone.utc)
     cfg = desk.risk
     ativos = {t.key for t in desk.traders}
@@ -106,6 +106,21 @@ def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int =
         keys,
     ).fetchone()
 
+    # resultado de cada dia (fuso do placar), para o gráfico "dia a dia" do app
+    from zoneinfo import ZoneInfo
+
+    fuso = ZoneInfo(cfg.timezone)
+    por_dia: dict[str, dict] = {}
+    for trader, pnl, closed in conn.execute(
+        f"SELECT trader, pnl, closed_at FROM trades WHERE closed_at IS NOT NULL AND trader IN ({marks})", keys
+    ):
+        dia = datetime.fromisoformat(closed).astimezone(fuso).date().isoformat()
+        d = por_dia.setdefault(dia, {"data": dia, "resultado": 0.0, "operacoes": 0, "vitorias": 0})
+        d["resultado"] += pnl or 0.0
+        d["operacoes"] += 1
+        d["vitorias"] += 1 if (pnl or 0) > 0 else 0
+    dias = [dict(d, resultado=_num(d["resultado"])) for _, d in sorted(por_dia.items())][-n_dias:]
+
     elenco = [
         {
             "key": t.key,
@@ -133,6 +148,7 @@ def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int =
             "resultado": _num(total[2]),
         },
         "traders": traders,
+        "dias": dias,
         "operacoes": ops,
         "eventos": eventos,
         "elenco": elenco,

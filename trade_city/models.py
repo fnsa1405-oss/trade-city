@@ -108,6 +108,7 @@ class ClosedTrade:
     exit_reason: str
     side: Side = Side.LONG
     features: tuple | None = None  # "clima" do gráfico na entrada, para o cérebro aprender
+    adds: int = 0  # entradas extras (preço médio ou pirâmide)
 
     @property
     def won(self) -> bool:

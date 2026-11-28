@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
+from .scaling import PIRAMIDE, Scaling
 from .strategies import DonchianEnsemble, MovingAverageTrend, OpeningRangeDayTrade, PivotV2, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
 from .strategies.orderflow import DeltaBreakout, ORBDelta
 
@@ -57,6 +58,7 @@ class TraderProfile:
     # (Levy: alvo na projeção de 61%, ganho típico de 1R), conferido pela escola
     min_reward_ratio: float | None = None
     school: str = ""  # conjunto próprio de estratégias na escola (ex.: "pivo"); vazio = o da casa
+    scaling: Scaling | None = field(default=None, compare=False)  # preço médio/pirâmide aprovado na escola
 
 
 def weekend_multiplier(cfg: RiskConfig, asset_class: AssetClass, ts) -> float:
@@ -228,6 +230,11 @@ def default_traders() -> list[TraderProfile]:
             reward_ratio=10.0,
             day_trade=True,
             micro=True,
+            # escola do preço médio (28/11/2026, mesmos 2 anos de 1 min no MYM): pirâmide de até 3
+            # contratos extras, um a cada 1R a favor, com o stop da posição subindo para a perda
+            # total nunca passar do risco inicial. Treino: fator de lucro 1,42 -> 1,68 e lucro
+            # +US$467 -> +US$1.096; prova: 1,34 -> 1,29 e +US$139 -> +US$186.
+            scaling=Scaling(PIRAMIDE, 3, 1.0),
         ),
         TraderProfile(
             key="flora",

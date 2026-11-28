@@ -217,6 +217,29 @@ class PaperBroker(Broker):
         order_id = self._exit(symbol, qty, price, "fechamento pela mesa")
         return Fill(order_id, price, qty)
 
+    def add_to_position(self, symbol: str, qty: float) -> Fill:
+        """Entrada extra (preço médio ou pirâmide) na posição aberta, a mercado."""
+        row = self.conn.execute("SELECT asset_class, qty, entry, side FROM paper_positions WHERE symbol = ?", (symbol,)).fetchone()
+        if row is None:
+            raise RuntimeError(f"sem posição simulada em {symbol}")
+        asset_class, old_qty, old_entry, side = AssetClass(row[0]), row[1], row[2], Side(row[3])
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), side.sign)
+        cost = self._reserve(symbol, price, qty)
+        if cost > self._cash() + 1e-6:
+            raise RuntimeError("saldo simulado insuficiente")
+        self._add_cash(-cost)
+        new_qty = old_qty + qty
+        avg = (old_entry * old_qty + price * qty) / new_qty
+        self.conn.execute("UPDATE paper_positions SET qty = ?, entry = ? WHERE symbol = ?", (new_qty, avg, symbol))
+        order_id = self._order(symbol, side.value, qty, price)
+        self.conn.commit()
+        return Fill(order_id, price, qty)
+
+    def set_stops(self, symbol: str, stop_loss: float, take_profit: float) -> None:
+        """Muda o stop e o alvo da posição inteira (ordem OCO na corretora)."""
+        self.conn.execute("UPDATE paper_positions SET stop_loss = ?, take_profit = ? WHERE symbol = ?", (stop_loss, take_profit, symbol))
+        self.conn.commit()
+
     def last_exit_price(self, symbol):
         row = self.conn.execute(
             "SELECT price FROM paper_exits WHERE symbol = ? ORDER BY id DESC LIMIT 1", (symbol,)

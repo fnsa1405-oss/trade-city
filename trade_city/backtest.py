@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from bisect import bisect_left
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from .auditor import AuditContext, Auditor
@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from .models import AssetClass, Bar, ClosedTrade, Side, Signal, TradePlan
 from .mood import compute_mood
 from .risk import Guardian
+from .scaling import SEM_ESCALA, Legs, Scaling
 from .stats import compute_stats, day_start
 
 
@@ -34,6 +35,20 @@ class BacktestReport:
     rejected: int = 0
     max_drawdown_pct: float = 0.0
     halted_at: datetime | None = None  # quando a trava de queda mandou o trader de volta à escola
+
+    @property
+    def daily_pnl(self) -> dict:
+        """Resultado de cada dia com operação (data de Nova York)."""
+        out: dict = {}
+        for t in self.trades:
+            d = t.closed_at.astimezone(NY).date()
+            out[d] = out.get(d, 0.0) + t.pnl
+        return out
+
+    @property
+    def green_days(self) -> float:
+        days = self.daily_pnl
+        return sum(v > 0 for v in days.values()) / len(days) if days else 0.0
 
     @property
     def total_pnl(self) -> float:
@@ -85,9 +100,25 @@ class BacktestReport:
 @dataclass
 class _Position:
     plan: TradePlan
-    entry: float
+    first_entry: float
     opened_at: datetime
     features: tuple | None = None
+    legs: Legs | None = None
+
+    def __post_init__(self):
+        plan = self.plan
+        if self.legs is None:
+            self.legs = Legs(SEM_ESCALA, plan.side.sign, plan.qty, plan.stop_loss, plan.take_profit, abs(plan.entry - plan.stop_loss))
+        if not self.legs.fills:
+            self.legs.fills.append((self.first_entry, self.legs.unit))
+
+    @property
+    def entry(self) -> float:
+        return self.legs.avg
+
+    @property
+    def qty(self) -> float:
+        return self.legs.qty
 
 
 NY = ZoneInfo("America/New_York")
@@ -107,6 +138,7 @@ def run_backtest(
     brain=None,
     fine: Sequence[Bar] | None = None,
     contract=None,
+    scaling: Scaling | None = None,
 ) -> BacktestReport:
     """Entradas no preço de abertura do candle seguinte ao sinal. Se stop e alvo cabem no mesmo
     candle, conta o stop (hipótese pessimista). Day trade nunca dorme posicionado.
@@ -114,6 +146,10 @@ def run_backtest(
     `contract`: microcontrato futuro (futures.Micro). Os candles do ETF viram dólares por
     contrato, a quantidade é inteira (contratos), a derrapagem é de 1 tick e a corretagem é
     cobrada por contrato.
+
+    `scaling`: preço médio para trás ou pirâmide (scaling.py). As entradas extras são ordens
+    em níveis marcados na largada, conferidas minuto a minuto; o stop é um só para a posição
+    inteira e o tamanho das pernas mantém o risco total fixo.
 
     `fine`: candles de 1 minuto do mesmo período. Com eles, entrada por ordem stop, stop e alvo
     são conferidos minuto a minuto dentro de cada candle, na ordem em que aconteceram."""
@@ -139,6 +175,26 @@ def run_backtest(
     def fill_out(price: float, sign: int) -> float:
         return price * (1 - sign * slippage_pct) - sign * slip_abs
 
+    integer = contract is not None or trader.asset_class is AssetClass.EQUITY
+    scale_info: dict[int, tuple[float, int]] = {}  # id do plano -> (tamanho da perna, entradas extras)
+
+    def scale_plan(plan: TradePlan, capital: float) -> TradePlan:
+        dist = abs(plan.entry - plan.stop_loss)
+        unit, adds = scaling.size(plan.qty, integer, dist, capital * risk.max_contract_risk, capital, unit_margin)
+        total_risk = unit * dist * scaling.risk_factor(adds)
+        new = replace(plan, qty=unit, risk_amount=total_risk)
+        scale_info[id(new)] = (unit, adds)
+        return new
+
+    def make_legs(plan: TradePlan, entry: float) -> Legs:
+        sign = plan.side.sign
+        dist = abs(plan.entry - plan.stop_loss)
+        unit, adds = scale_info.pop(id(plan), (plan.qty, 0))
+        sc = scaling if scaling is not None and adds > 0 else SEM_ESCALA
+        # níveis medidos a partir do preço planejado, para não depender da derrapagem
+        legs = Legs(sc, sign, unit, plan.stop_loss, plan.take_profit, dist, sc.levels(plan.entry, dist, sign, adds))
+        return legs
+
     guardian, auditor = Guardian(risk), Auditor(risk)
     strategy.prepare(bars)
     report = BacktestReport(trader.name, trader.symbol, bars[0].ts if bars else None, bars[-1].ts if bars else None, trader.capital)
@@ -153,10 +209,11 @@ def run_backtest(
 
     def close(pos: _Position, price: float, ts: datetime, reason: str) -> None:
         nonlocal equity, peak
-        qty, side = pos.plan.qty, pos.plan.side
+        qty, side = pos.qty, pos.plan.side
+        # taxa sobre o valor de cada perna na entrada (média x quantidade) e na saída
         pnl = (price - pos.entry) * qty * side.sign - fee_pct * (pos.entry + price) * qty - 2 * fee_abs * qty
         report.trades.append(
-            ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason, side, pos.features)
+            ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason, side, pos.features, pos.legs.adds)
         )
         pnls.append((ts, pnl))
         equity += pnl
@@ -187,7 +244,7 @@ def run_backtest(
             if pending_trigger is None:  # ordem a mercado na abertura
                 entry = fill_in(bar.open, sign)
                 if low < entry < high:
-                    position = _Position(pending, entry, bar.ts, pending_features)
+                    position = _Position(pending, entry, bar.ts, pending_features, make_legs(pending, entry))
                 pending = None
             else:
                 long_order = pending.side is Side.LONG
@@ -203,7 +260,7 @@ def run_backtest(
                     base = max(sb.open, pending_trigger) if long_order else min(sb.open, pending_trigger)
                     entry = fill_in(base, sign)
                     if low < entry < high:
-                        position = _Position(pending, entry, sb.ts, pending_features)
+                        position = _Position(pending, entry, sb.ts, pending_features, make_legs(pending, entry))
                         first = fill_k = k_hit
                     pending = None
                 elif not same_day or i >= pending_until:
@@ -211,6 +268,7 @@ def run_backtest(
 
         if position is not None:
             plan = position.plan
+            legs = position.legs
             long = plan.side is Side.LONG
             sign = plan.side.sign
             if strategy.day_trade and bar.ts.astimezone(NY).date() != position.opened_at.astimezone(NY).date():
@@ -220,17 +278,26 @@ def run_backtest(
             else:
                 for k in range(first, len(subs)):
                     sb = subs[k]
-                    if (sb.low <= plan.stop_loss) if long else (sb.high >= plan.stop_loss):
-                        worst = min(sb.open, plan.stop_loss) if long else max(sb.open, plan.stop_loss)
-                        if k == fill_k:
-                            worst = plan.stop_loss  # a abertura veio antes da entrada; sai no stop
+                    added = False
+                    while k != fill_k and legs.touched(sb.low, sb.high):
+                        # entrada extra: ordem no nível marcado (pior entre ele e a abertura)
+                        lvl = legs.next_level()
+                        against = legs.scaling.mode == "media"
+                        base = (min(sb.open, lvl) if long else max(sb.open, lvl)) if against else (max(sb.open, lvl) if long else min(sb.open, lvl))
+                        legs.add(fill_in(base, sign))
+                        added = True
+                    stop, target = legs.stop, legs.target
+                    if (sb.low <= stop) if long else (sb.high >= stop):
+                        worst = min(sb.open, stop) if long else max(sb.open, stop)
+                        if k == fill_k or added:
+                            worst = stop  # a abertura veio antes da entrada; sai no stop
                         close(position, fill_out(worst, sign), sb.ts, "stop loss")
                         position = None
                         break
-                    if k == fill_k:
-                        continue  # no minuto da entrada por ordem stop, o alvo não conta (pessimista)
-                    if (sb.high >= plan.take_profit) if long else (sb.low <= plan.take_profit):
-                        best = max(sb.open, plan.take_profit) if long else min(sb.open, plan.take_profit)
+                    if k == fill_k or added:
+                        continue  # no minuto de uma entrada, o alvo não conta (pessimista)
+                    if (sb.high >= target) if long else (sb.low <= target):
+                        best = max(sb.open, target) if long else min(sb.open, target)
                         close(position, best, sb.ts, "stop gain")
                         position = None
                         break
@@ -258,6 +325,8 @@ def run_backtest(
         if plan is None:
             report.rejected += 1
             continue
+        if scaling is not None and scaling.active:
+            plan = scale_plan(plan, stats.capital)
         ctx = AuditContext(
             capital=stats.capital,
             peak_capital=stats.peak_capital,

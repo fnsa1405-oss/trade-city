@@ -213,6 +213,69 @@ def _history_note(series) -> str:
     return "Histórico de day trade: " + "; ".join(parts) + "\n"
 
 
+def _school_scaling(trader, args) -> str:
+    """Escola do preço médio inteligente: day trade com micro futuros (índices) ou cripto,
+    cada estratégia com o tipo de preço médio que combina com ela, contra ela mesma sem."""
+    from dataclasses import replace
+
+    from .models import AssetClass
+    from .school import DAY_RISK_VARIANTS, SCALE_CANDIDATES, SCALINGS, evaluate, report_markdown, with_15min
+
+    symbol = args.ativo or trader.symbol
+    crypto = "/" in symbol
+    student = replace(
+        trader,
+        symbol=symbol,
+        asset_class=AssetClass.CRYPTO if crypto else AssetClass.EQUITY,
+        day_trade=True,
+        approved=False,
+        scaling=None,
+    )
+    if crypto:
+        from .public_data import public_bars
+
+        series = {"5min": public_bars(symbol, student.asset_class, "5min", 365)}
+        series = with_15min(series)
+        note = "Cripto em day trade (zera no fim do dia de Nova York). Custo: 0,1% de taxa + 0,05% de derrapagem por lado.\n"
+        fine = None  # 1 min só cobre 90 dias: não serve para o ano inteiro
+    else:
+        from .futures import MICROS
+        from .history import DAY_TIMEFRAMES, intraday_history
+
+        series = {tf: intraday_history(symbol, tf, args.dados) for tf in DAY_TIMEFRAMES}
+        note = _history_note(series) + f"Microcontrato {MICROS[symbol].code}: 1 tick de derrapagem e US$0,85 por contrato por lado.\n"
+        series = with_15min(series)
+        fine = series.get("1min")
+    cands = [c for c in SCALE_CANDIDATES if not (crypto and c.timeframes)]
+    results = evaluate(student, series, candidates=cands, risks=DAY_RISK_VARIANTS, scalings=SCALINGS, fine=fine)
+    head = f"Preço médio inteligente em {symbol}.\n"
+    return report_markdown(student, results) + head + note + _scaling_table(results)
+
+
+def _scaling_table(results) -> str:
+    """Para cada estratégia: a melhor versão sem e com preço médio/pirâmide (no treino) e a prova."""
+    from .school import SchoolRules, _pf
+
+    rules = SchoolRules()
+    lines = ["", "| Estratégia | Versão | Treino FL | Prova FL | Prova | Dias com lucro (prova) | Passou |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    by: dict = {}
+    for r in results:
+        kind = "sem" if r.scaling.startswith("sem") else "com"
+        key = (r.candidate, kind)
+        ok_trades = len(r.train.trades) >= rules.train_min_trades
+        score = (r.train.profit_factor if ok_trades else 0, len(r.train.trades))
+        if key not in by or score > by[key][0]:
+            by[key] = (score, r)
+    for (cand, kind), (_, r) in sorted(by.items()):
+        ok = r.train_ok(rules) and r.test_ok(rules)
+        version = r.scaling if kind == "com" else "sem preço médio"
+        lines.append(
+            f"| {cand} ({r.timeframe}) | {version}; {r.risk} | {_pf(r.train.profit_factor)} | {_pf(r.test.profit_factor)} | "
+            f"{r.test.total_pnl / r.test.base_capital:+.1%} | {r.test.green_days:.0%} | {'sim' if ok else 'não'} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> None:
     _load_env_file()
     parser = argparse.ArgumentParser(prog="trade_city", description="Trade City: mesa de traders de IA")
@@ -240,8 +303,14 @@ def main(argv: list[str] | None = None) -> None:
     bt.add_argument("--salvar", help="salva os candles baixados neste CSV")
     esc = sub.add_parser("escola", help="testa várias estratégias e tempos gráficos por trader")
     esc.add_argument("trader", nargs="?", default="todos")
-    esc.add_argument("--modo", choices=["normal", "swing", "scalp", "fluxo"], default="normal", help="swing = índices em swing (60 min e diário); scalp = criptos em 1 e 5 min; fluxo = estratégias de fluxo de ordens")
+    esc.add_argument(
+        "--modo",
+        choices=["normal", "swing", "scalp", "fluxo", "escala"],
+        default="normal",
+        help="swing = índices em swing (60 min e diário); scalp = criptos em 1 e 5 min; fluxo = estratégias de fluxo de ordens; escala = day trade com preço médio e pirâmide",
+    )
     esc.add_argument("--fluxo", default="fluxo", help="pasta com o histórico de fluxo das criptos (fluxo-historico)")
+    esc.add_argument("--ativo", help="modo escala: testa este ativo (ex.: DIA, QQQ, BTC/USD) no lugar do ativo do trader")
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     esc.add_argument("--dados", default="dados", help="pasta com os candles guardados pelo coletor")
@@ -316,6 +385,11 @@ def main(argv: list[str] | None = None) -> None:
             print(f"escola: {trader.name} ({trader.symbol})...", flush=True)
             try:
                 note = ""
+                if args.modo == "escala":
+                    section = _school_scaling(trader, args)
+                    print(section, flush=True)
+                    parts.append(section)
+                    continue
                 if args.modo == "fluxo":
                     section = _flow_school(trader, args)
                     print(section, flush=True)
