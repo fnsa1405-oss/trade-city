@@ -1,5 +1,12 @@
 Trade City (paper)
 
+Bia Satoshi  (BTC/USD, Rompimento com agressão (55))
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
 Sol Ventura  (SOL/USD, Momento de série temporal (28 candles))
   humor: normal
   hoje: 0/10 vitórias, 0/5 derrotas, +0.00
@@ -14,7 +21,7 @@ Rui Xis  (XRP/USD, Donchian em conjunto (Zarattini/Pagani/Barbon))
   aprendizes liberados: 0 (1 a cada 100 de lucro)
   posição: nenhuma
 
-Dora Doge  (DOGE/USD, Donchian em conjunto (Zarattini/Pagani/Barbon))
+Dora Doge  (DOGE/USD, Rompimento com agressão (20))
   humor: normal
   hoje: 0/10 vitórias, 0/5 derrotas, +0.00
   capital: 10000.00 (pico 10000.00), lucro realizado +0.00
