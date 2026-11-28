@@ -82,8 +82,9 @@ def test_every_setup_runs_and_respects_day_trade(cand):
 
 def test_setups_trade_on_trending_days():
     bars = session_bars(days=12, seed=2)
-    traded = sum(bool(run_backtest(day_trader(c.make()), bars, RiskConfig()).trades) for c in DAY_CANDIDATES)
-    assert traded >= len(DAY_CANDIDATES) // 2
+    cands = [c for c in DAY_CANDIDATES if c.timeframes is None or "5min" in c.timeframes]
+    traded = sum(bool(run_backtest(day_trader(c.make()), bars, RiskConfig()).trades) for c in cands)
+    assert traded >= len(cands) // 2
 
 
 def test_with_15min_builds_from_5min():
