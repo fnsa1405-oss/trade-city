@@ -1,7 +1,7 @@
 {
  "versao": 1,
  "mesa": "swing",
- "gerado_em": "2026-11-28T11:58:52+00:00",
+ "gerado_em": "2026-11-28T12:00:30+00:00",
  "modo": "simulado",
  "travada": false,
  "travas": {
@@ -35,7 +35,7 @@
     "meta_vitorias": 10,
     "max_derrotas": 5
    },
-   "ultimo_candle": "2026-11-28T04:00:00+00:00",
+   "ultimo_candle": "2026-11-28T08:00:00+00:00",
    "ultimos": [],
    "posicao": null
   },
@@ -83,7 +83,7 @@
     "meta_vitorias": 10,
     "max_derrotas": 5
    },
-   "ultimo_candle": "2026-11-28T04:00:00+00:00",
+   "ultimo_candle": "2026-11-28T08:00:00+00:00",
    "ultimos": [],
    "posicao": null
   },
@@ -107,7 +107,7 @@
     "meta_vitorias": 10,
     "max_derrotas": 5
    },
-   "ultimo_candle": "2026-11-28T04:00:00+00:00",
+   "ultimo_candle": "2026-11-28T08:00:00+00:00",
    "ultimos": [],
    "posicao": null
   },
@@ -192,66 +192,84 @@
    "key": "bia",
    "nome": "Bia Satoshi",
    "ativo": "BTC/USD",
+   "persona": "Não dorme: vigia o Bitcoin 24h e só compra o rompimento quando os compradores agridem.",
    "situacao": "na mesa"
   },
   {
    "key": "edu",
    "nome": "Edu Éter",
    "ativo": "ETH/USD",
+   "persona": "Engenheiro da turma: opera Ethereum e confere tudo duas vezes.",
    "situacao": "na escola"
   },
   {
    "key": "sol",
    "nome": "Sol Ventura",
    "ativo": "SOL/USD",
+   "persona": "Rápida e ousada: compra a Solana quando o retorno de 28 dias vira positivo.",
    "situacao": "na mesa"
   },
   {
    "key": "rui",
    "nome": "Rui Xis",
    "ativo": "XRP/USD",
+   "persona": "Calmo e paciente: espera o XRP sair do lugar.",
    "situacao": "na mesa"
   },
   {
    "key": "dora",
    "nome": "Dora Doge",
    "ativo": "DOGE/USD",
+   "persona": "A mais animada do escritório: compra o Dogecoin quando ele rompe com agressão de compra.",
    "situacao": "na mesa"
   },
   {
    "key": "teo",
    "nome": "Teo Chip",
    "ativo": "QQQ",
+   "persona": "Disciplinado e paciente: compra o Nasdaq 100 quando rompe a máxima de 20 dias.",
    "situacao": "na mesa"
   },
   {
    "key": "lena",
    "nome": "Dona Lena",
    "ativo": "SPY",
+   "persona": "Paciente e experiente: compra o S&P 500 quando rompe a máxima de 20 dias.",
    "situacao": "na mesa"
   },
   {
    "key": "davi",
    "nome": "Davi Dow",
    "ativo": "DIA",
+   "persona": "Veterano do pregão: compra o Dow Jones (DIA) quando rompe a máxima de 20 dias.",
    "situacao": "na mesa"
   },
   {
    "key": "mia",
    "nome": "Mia Média",
    "ativo": "DIA",
+   "persona": "Day trade no Dow com o microcontrato MYM: só opera a favor das médias e entra no candle de força.",
    "situacao": "na escola"
   },
   {
    "key": "flora",
    "nome": "Flora Fluxo",
    "ativo": "SPY",
+   "persona": "Day trade no S&P com o microcontrato MES: segue a abertura só quando a agressão concorda.",
+   "situacao": "na escola"
+  },
+  {
+   "key": "levy",
+   "nome": "Levy Pivô",
+   "ativo": "QQQ",
+   "persona": "Pesquisador e disciplinado: um setup só, o Pivô no 2 min do Nasdaq (micro MNQ). Sem critério, sem trade. Pensa em amostras, não em um trade.",
    "situacao": "na escola"
   },
   {
    "key": "ivo",
    "nome": "Ivo Miúdo",
    "ativo": "IWM",
+   "persona": "Elétrico: faz day trade nas pequenas empresas americanas (Russell 2000, IWM).",
    "situacao": "na escola"
   }
  ]
