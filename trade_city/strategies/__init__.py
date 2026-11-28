@@ -11,6 +11,7 @@ from .daytrade import (
 from .mean_reversion import MeanReversion
 from .opening_range import OpeningRangeBreakout
 from .published import ConnorsRSI2, DoubleSevens, HolyGrail, TurtleBreakout, WilliamsBreakout
+from .research import CumulativeRSI, IBSReversion, TimeSeriesMomentum, TurnOfMonth
 from .setups import (
     FibonacciPullback,
     LarryWilliams91,
@@ -56,4 +57,8 @@ __all__ = [
     "WyckoffSpring",
     "WyckoffSOSLPS",
     "WyckoffClimax",
+    "TimeSeriesMomentum",
+    "TurnOfMonth",
+    "IBSReversion",
+    "CumulativeRSI",
 ]

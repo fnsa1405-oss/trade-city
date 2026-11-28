@@ -113,6 +113,15 @@ Estratégias atuais de cripto (pesquisa de 27/11/2026, `trade_city/strategies/cr
 | Teoria de Dow | Charles Dow | Fundo mais alto e rompimento do último topo; sai na perda do último fundo | [Investopedia](https://www.investopedia.com/terms/d/dowtheory.asp) |
 | Abertura da Ásia na segunda | Concretum Research (2025) | Compra domingo 19h de Nova York acima da média de 20 dias, vende 24h depois | [Concretum](https://concretumgroup.com/seasonality-in-bitcoin-intraday-trend-trading/) |
 
+**Pesquisa de 28/11/2026** (anomalias com estudos publicados e replicados):
+
+| Estratégia | Estudo | Regra |
+| --- | --- | --- |
+| Momento de série temporal 28/56 | Moskowitz, Ooi e Pedersen (2012); Liu e Tsyvinski (2021) nas criptos | Compra quando o retorno de N candles vira positivo, acima da média de N; sai quando fica negativo |
+| Virada do mês | Lakonishok e Smidt (1988); McConnell e Xu (2008) | Compra no último pregão do mês, sai no 3º pregão do mês seguinte |
+| IBS < 0,2 | Pagonidis (2014, NAAIM) | Fechamento nos 20% de baixo do candle, acima da MM200; sai nos 20% de cima |
+| IFR(2) acumulado | Connors e Alvarez (2008) | Acima da MM200, soma do IFR(2) de 2 dias abaixo de 35; sai com IFR(2) acima de 65 |
+
 ### Escola de day trade (QQQ, SPY, DIA, IWM)
 
 Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 min confirma e o gatilho sai no candle de 15, 5 ou 1 minuto (a escola testa os três). Opera comprado e vendido, o stop vem do gráfico (fundo ou topo do gatilho), não abre nada depois das 15h e zera tudo às 15h50 de Nova York. Custo: 0,01% por lado (spread e corretagem de ETF líquido).
