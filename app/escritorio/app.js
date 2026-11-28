@@ -808,6 +808,27 @@ function traderCard(tr) { return `<div class="ch">${avatar(tr.key, tr.cor, tr.no
   <p>${tr.situacao === 'na escola' ? 'Saiu da mesa e voltou a estudar. Só volta quando passar de novo na prova.' : tr.estrategia}${STATE.aoVivo ? '' : `<br>Prova na escola: fator de lucro <b>${tr.pf_escola.toFixed(2).replace('.', ',')}</b>`}</p>
   <div class="mood">${MOODS.map(m => `<span class="${m === tr.humor ? 'on' : ''}">${m}</span>`).join('')}</div>
   <div class="kv"><div><small>hoje</small><b>${tr.vitorias}V · ${tr.derrotas}D</b></div><div><small>capital</small><b>$${tr.capital.toLocaleString('pt-BR')}</b></div><div><small>posição</small><b>${tr.posicao}</b></div></div>`; }
+/* ================= conselho de consultores ================= */
+// Fallback até a primeira reunião (workflow Conselho grava conselho-dados/conselho.json).
+const CONSELHO = [
+  { chave: 'iris', nome: 'Íris Valente', papel: 'Estatística e qualidade dos dados', inspirado_em: 'Renaissance Technologies e Jim Simons', fala: 'Vantagem pequena, repetida muitas vezes. Mas só se não for sorte.', cor: '#8fe6ff' },
+  { chave: 'otto', nome: 'Otto Barreto', papel: 'Risco da carteira e diversificação', inspirado_em: 'Two Sigma, Citadel e D.E. Shaw', fala: 'Quantas apostas temos de verdade?', cor: '#ffd25e' },
+  { chave: 'heitor', nome: 'Heitor Mendes', papel: 'Regime do mercado, custos e tamanho da posição', inspirado_em: 'livros de Ernest P. Chan', fala: 'Tendência ou volta à média? O custo decide.', cor: '#3ddc97' },
+  { chave: 'lia', nome: 'Lia Furtado', papel: 'Debate touro contra urso', inspirado_em: 'projetos abertos TradingAgents e AI Hedge Fund', fala: 'Antes de comprar, o urso fala.', cor: '#ff9ad5' },
+  { chave: 'rafa', nome: 'Rafa Lemos', papel: 'Robustez dos testes', inspirado_em: 'QuantConnect e o motor LEAN', fala: 'Platô, não pico. E prova de avanço.', cor: '#c9a2ff' },
+];
+const CONSELHO_POS = [[-1.6, 5.6, 0], [-.5, 5.6, 0], [.6, 5.6, 0], [-1.6, 7.6, Math.PI], [-.5, 7.6, Math.PI]];
+async function carregarConselho() {
+  try {
+    const r = await fetch(`https://raw.githubusercontent.com/fnsa1405-oss/trade-city/conselho-dados/conselho.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return; const j = await r.json();
+    for (const c of j.conselheiros || []) { const alvo = CONSELHO.find(x => x.chave === c.chave); if (alvo) Object.assign(alvo, { fala: c.fala, papel: c.papel, inspirado_em: c.inspirado_em, alertas: c.alertas, propostas: c.propostas, achados: c.achados }); }
+  } catch { /* fica a fala padrão */ }
+}
+function conselhoCard(c) { const esc = s => String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+  const rec = (c.propostas || []).filter(p => p.status === 'recomendada' || p.status === 'melhorou').length;
+  const extra = c.achados ? `<p>${c.alertas || 0} alerta(s) e ${rec} proposta(s) recomendada(s) na última reunião.</p>` : '<p>A primeira reunião ainda não aconteceu.</p>';
+  return `<div class="ch">${avatar(c.chave, c.cor, c.nome)}<div><h3>${esc(c.nome)}</h3><i>${esc(c.papel)}</i></div><span class="st">conselho</span></div><p>“${esc(c.fala)}”</p>${extra}<p style="opacity:.7;font-size:.85em">Personagem inspirado em ${esc(c.inspirado_em)}. Não é essa pessoa ou empresa.</p>`; }
 function teamCard(p) { return `<div class="ch">${avatar(p.key, p.cor, p.nome)}<div><h3>${p.nome}</h3><i>${p.papel}</i></div></div><p>${p.fala}</p>`; }
 function studentCard(s) { return `<div class="ch">${avatar(s.key, s.cor, s.nome)}<div><h3>${s.nome}</h3><i>aluna(o) de ${s.ativo}</i></div><span class="st">na escola</span></div><p>Ainda não passou na prova. Precisa de fator de lucro 1,3 para ganhar uma mesa.</p>`; }
 function tab(name) {
@@ -887,6 +908,12 @@ const CAST = {
   paulo: { file: M, hairs: ['SimpleParted'], shirt: 0x7b7f87, pants: 0x7b7f87, inner: W_, tie: 0x2c4a86, shoes: 0x3a2416, hair: 0x2a1c14, skin: SKIN[1], height: 1.76, seed: 17 },
   davi: { file: M, hairs: ['Balding', 'Moustache'], glasses: true, shirt: 0x2d3340, pants: 0x2d3340, inner: W_, tie: 0x6b1f2a, shoes: SH, hair: 0x8a8a8a, skin: SKIN[0], height: 1.77, seed: 18 },
   ivo: { file: M, hairs: ['Buzzed'], shirt: 0x3b4a6b, pants: 0x1c1d22, shoes: 0xf2f2f2, hair: 0x2a1c14, skin: SKIN[3], height: 1.74, seed: 19 },
+  // conselho de consultores (trade_city/conselho.py): personagens inspirados em referências públicas
+  iris: { file: F, hairs: [], longHair: 'medio', glasses: true, shirt: 0x1f2a4a, pants: 0x1c1d22, inner: 0xe9e4da, vbot: .36, shoes: SH, hair: 0xb9b4ad, brow: 0x8a857e, skin: SKIN[0], height: 1.66, seed: 31, talky: true },
+  otto: { file: M, hairs: ['SlickBack'], shirt: 0x5a5f69, pants: 0x5a5f69, inner: W_, shoes: SH, hair: 0x3a2a1e, skin: SKIN[0], height: 1.88, seed: 32 },
+  heitor: { file: M, hairs: ['SimpleParted', 'Beard'], glasses: true, shirt: 0xe6ecf5, pants: 0x2b2e35, shoes: 0x3a2416, hair: 0x222222, skin: SKIN[2], height: 1.76, seed: 33, talky: true },
+  lia: { file: F, hairs: [], longHair: 'cacheado', shirt: 0x55603a, pants: 0x18181b, inner: 0xf2efe8, vbot: .36, shoes: SH, hair: 0x1c120c, brow: 0x1c120c, skin: SKIN[3], height: 1.64, seed: 34, talky: true },
+  rafa: { file: M, hairs: ['Buzzed'], shirt: 0x6d7078, pants: 0x1f2a44, shoes: 0xf2f2f2, hair: 0x1e1612, skin: SKIN[1], height: 1.79, seed: 35 },
   rita: { file: F, hairs: ['Ponytail'], shirt: 0xf1f1ef, pants: 0x18181b, inner: 0xf1f1ef, tie: 0x141416, shoes: SH, hair: 0x2a1a12, brow: 0x2a1a12, skin: SKIN[2], height: 1.64, seed: 21 },
   pedro: { file: M, hairs: ['Buzzed', 'Beard'], shirt: 0x3c6e9a, pants: 0x2a2f45, long: false, shoes: 0xe9e9ee, hair: 0x1a1410, skin: SKIN[2], height: 1.79, seed: 22 },
   bruna: { file: F, hairs: [], longHair: 'cacheado', shirt: 0xe2a33b, pants: 0x1d2a4a, long: false, shoes: 0xe9e9ee, hair: 0x2a1810, brow: 0x2a1810, skin: SKIN[3], height: 1.67, seed: 23 },
@@ -922,8 +949,12 @@ async function main() {
   { const p = npc('paulo', 'Paulo', 'do suporte', 'A impressora voltou a funcionar!'); p.position.set(5.2, 0, -.85); p.rotation.y = p.userData.yaw = Math.PI; p.userData.cycle = ['Interact', 0, 'Idle', 3, 'Phone', 6]; play(p, 'Idle', 0); }
   { const p = npc('mari', 'Mari', 'do marketing', 'Esse sofá é o melhor lugar da firma.'); seat(p, -7.3, 8.25, Math.PI, .4); sitPose(p); }
   { const p = npc('leo', 'Léo', 'do design', 'Pausa de cinco minutos e já volto.'); seat(p, -8.05, 8.25, Math.PI, .4); sitPose(p); }
-  { const p = npc('gui', 'Gui', 'gerente de operações', 'Precisamos revisar o risco da semana.'); seat(p, -.5, 5.6, 0); sitPose(p); }
-  { const p = npc('ju', 'Ju', 'compliance', 'Tudo registrado e auditado.'); seat(p, -.5, 7.6, Math.PI); sitPose(p); }
+  { const p = npc('gui', 'Gui', 'gerente de operações', 'Precisamos revisar o risco da semana.'); seat(p, .6, 7.6, Math.PI); sitPose(p); }
+  { const p = npc('ju', 'Ju', 'compliance', 'Tudo registrado e auditado.'); p.position.set(4.35, 0, -.55); p.rotation.y = p.userData.yaw = Math.PI / 2; p.userData.cycle = ['Idle', 5, 'Talk', 4]; play(p, 'Idle', 0, { offset: 2 }); }
+  // sala do conselho: os 5 consultores em volta da mesa de reunião, com o Gui puxando a pauta
+  CONSELHO.forEach((c, i) => { const [x, z, yaw] = CONSELHO_POS[i]; const p = mk(c.chave); seat(p, x, z, yaw); sitPose(p); p.userData.info = { kind: 'conselho', d: c }; clickables.push(p); });
+  labels.push(label3d('Conselho', '5 consultores revisam a mesa', '#ffd25e', new THREE.Vector3(-.5, 2.6, 6.6)));
+  carregarConselho();
   labels.push(label3d('Escola', 'estratégias em prova', '#8fe6ff', new THREE.Vector3(7.6, 2.9, 1.6)));
   labels.push(label3d('Corretora', 'modo simulado', '#ffd25e', new THREE.Vector3(10.6, 2.9, -2.2)));
   // café servido na mesa: Caio e Rita pegam na copa, entram pela porta da sala e servem cada trader
@@ -946,6 +977,7 @@ async function main() {
     if (inf.kind === 'student') { showCard(studentCard(inf.d)); say(o, 'Na próxima prova eu passo!'); }
     if (inf.kind === 'cafe') { showCard(`<div class="ch">${avatar('caio', '#e8ecff', 'Caio')}<div><h3>Caio</h3><i>garçom da sala de operações</i></div></div><p>Pega o café na copa e serve cada trader na mesa, um por vez.</p>`); say(o, 'Café fresquinho!'); }
     if (inf.kind === 'npc') { showCard(`<div class="ch">${avatar(inf.key, '#cfd4ff', inf.nome)}<div><h3>${inf.nome}</h3><i>${inf.papel}</i></div></div><p>Faz parte da equipe que mantém a Trade City funcionando.</p>`); say(o, inf.fala); }
+    if (inf.kind === 'conselho') { showCard(conselhoCard(inf.d)); say(o, inf.d.fala); }
     if (inf.kind === 'cat') { showCard(`<div class="ch"><span class="av" style="background:#e3a868">B</span><div><h3>Bolota</h3><i>a gata da segurança</i></div></div><p>Faz a ronda do escritório e cochila no sofá do lounge.</p>`); say(o, 'Miau.'); } });
   // reflexo de ambiente discreto em tudo (o ambiente ilumina, mas sem lavar a cena)
   scene.traverse(o => { const ms = o.material ? [].concat(o.material) : []; ms.forEach(m => { if (m.envMapIntensity === 1 && m.name !== 'glass') m.envMapIntensity = .28; }); });
@@ -996,6 +1028,7 @@ function simulate(t, dt) {
     for (const k of ['pedro', 'bruna']) { const p = actors[k]; if (!p) continue; const a = p.userData.acts.Interact; if (!a) continue; const dur = a.getClip().duration, hit = p.userData.ping < 0 ? 0 : .5; a.time = (((u - hit + 1.12) % 1)) * dur; } }
   if (Math.floor(t * 10) !== Math.floor((t - dt) * 10)) drawArcade(t);
   if (!order && !REC && !STATE.aoVivo && t > 8 && Math.floor(t) % 40 === 0) startOrder();
+  if (t > 12 && Math.floor(t / 18) !== Math.floor((t - dt) / 18)) { const c = CONSELHO[Math.floor(t / 18) % CONSELHO.length]; if (actors[c.chave]) say(actors[c.chave], c.fala, 4.5); }
   { const n = actors.nico; const u = n && n.userData; if (u && u.settle) { const k = easeIO(Math.min(1, (t - u.settle.t0) / u.settle.dur)); n.position.lerpVectors(u.settle.from, u.seatPos, k); u.yaw = lerpAngle(u.settle.fromYaw, u.home.yaw, k); n.rotation.y = u.yaw; if (k >= 1) u.settle = null; } }
   updateOrder(t, dt);
 }

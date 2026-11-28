@@ -318,6 +318,10 @@ def main(argv: list[str] | None = None) -> None:
     cer.add_argument("--dados", default="dados")
     cer.add_argument("--pasta", default="cerebros")
     cer.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
+    con = sub.add_parser("conselho", help="reunião do conselho de 5 consultores: revisa a mesa e testa propostas na escola")
+    con.add_argument("--dias", type=int, default=2900, help="dias de histórico das criptos")
+    con.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
+    con.add_argument("--json", help="salva o relatório em JSON (para o app e o escritório 3D)")
     flh = sub.add_parser("fluxo-historico", help="baixa/atualiza o histórico de fluxo das criptos (Binance, grátis)")
     flh.add_argument("--pasta", default="fluxo")
     flh.add_argument("--desde", default="2017-01-01")
@@ -490,6 +494,42 @@ def main(argv: list[str] | None = None) -> None:
         if args.saida:
             with open(args.saida, "w") as fh:
                 fh.write(text)
+        return
+
+    if args.cmd == "conselho":
+        import json
+
+        from .conselho import build_dossiers, convene, report_json, report_markdown
+        from .models import AssetClass
+        from .public_data import public_bars
+
+        def fetch(t):
+            print(f"conselho: baixando {t.symbol} ({t.timeframe})...", flush=True)
+            try:
+                if t.asset_class is AssetClass.CRYPTO:
+                    return public_bars(t.symbol, t.asset_class, t.timeframe, args.dias)
+                return public_bars(t.symbol, t.asset_class, t.timeframe, 3650)
+            except Exception as exc:
+                print(f"  aviso: {t.symbol} falhou: {exc}", flush=True)
+                return []
+
+        traders = [t for t in default_traders() if t.approved]
+        dossiers = build_dossiers(traders, fetch)
+        factors = {}
+        for sym, cls in (("SPY", AssetClass.EQUITY), ("BTC/USD", AssetClass.CRYPTO)):
+            try:
+                factors[sym] = public_bars(sym, cls, "1d", 730)
+            except Exception as exc:
+                print(f"  aviso: fator {sym} falhou: {exc}", flush=True)
+        opinions = convene(dossiers, factors)
+        text = report_markdown(opinions)
+        print(text)
+        if args.saida:
+            with open(args.saida, "w") as fh:
+                fh.write(text)
+        if args.json:
+            with open(args.json, "w") as fh:
+                json.dump(report_json(opinions), fh, ensure_ascii=False, indent=1)
         return
 
     if args.cmd == "coletar":
