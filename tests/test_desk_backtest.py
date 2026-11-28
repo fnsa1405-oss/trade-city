@@ -81,9 +81,12 @@ def test_desk_respects_closed_market():
     broker.bars["SPY"] = make_bars([100 + i for i in range(40)])
     broker.market_open = False
     desk = _desk(trader, broker, clock)
-    events = desk.run_once()
-    assert any("mercado fechado" in e for e in events)
+    assert desk.run_once() == []  # fechado: nem analisa, o candle fica para a abertura
     assert not broker.positions
+    broker.market_open = True
+    events = desk.run_once()
+    assert any("sinal" in e for e in events), events
+    assert broker.positions
 
 
 def test_backtest_runs_and_respects_stops(uptrend):

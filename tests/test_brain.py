@@ -79,17 +79,17 @@ def test_promoted_brain_puts_trader_on_desk(tmp_path, monkeypatch):
     from trade_city.brain import setup_of
     from trade_city.config import default_traders
 
-    teo = next(t for t in default_traders() if t.key == "teo")
-    brain = fit("teo", [[0.0] * len(FEATURE_NAMES), [1.0] * len(FEATURE_NAMES)], [0, 1], epochs=5)
+    teo = next(t for t in default_traders() if t.key == "ivo")
+    brain = fit("ivo", [[0.0] * len(FEATURE_NAMES), [1.0] * len(FEATURE_NAMES)], [0, 1], epochs=5)
     brain.promoted, brain.setup = True, setup_of(teo)
     folder = tmp_path / "cerebros"
     folder.mkdir()
-    (folder / "teo.json").write_text(brain.to_json())
+    (folder / "ivo.json").write_text(brain.to_json())
     monkeypatch.chdir(tmp_path)
-    assert "teo" in {t.key for t in cli._desk(":memory:", grupo="day").traders}
+    assert "ivo" in {t.key for t in cli._desk(":memory:", grupo="day").traders}
     brain.setup = "outra configuração"
-    (folder / "teo.json").write_text(brain.to_json())
-    assert "teo" not in {t.key for t in cli._desk(":memory:", grupo="day").traders}
+    (folder / "ivo.json").write_text(brain.to_json())
+    assert "ivo" not in {t.key for t in cli._desk(":memory:", grupo="day").traders}
 
 
 def test_paper_account_funds_new_traders():
