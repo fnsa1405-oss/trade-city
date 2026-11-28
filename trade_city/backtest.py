@@ -86,6 +86,7 @@ class _Position:
     plan: TradePlan
     entry: float
     opened_at: datetime
+    features: tuple | None = None
 
 
 NY = ZoneInfo("America/New_York")
@@ -101,6 +102,8 @@ def run_backtest(
     risk: RiskConfig | None = None,
     fee_pct: float | None = None,
     slippage_pct: float | None = None,
+    record_features: bool = False,
+    brain=None,
 ) -> BacktestReport:
     """Entradas no preço de abertura do candle seguinte ao sinal. Se stop e alvo cabem no mesmo
     candle, conta o stop (hipótese pessimista). Day trade nunca dorme posicionado."""
@@ -119,12 +122,15 @@ def run_backtest(
     peak = equity = trader.capital
     position: _Position | None = None
     pending: TradePlan | None = None
+    pending_features: tuple | None = None
 
     def close(pos: _Position, price: float, ts: datetime, reason: str) -> None:
         nonlocal equity, peak
         qty, side = pos.plan.qty, pos.plan.side
         pnl = (price - pos.entry) * qty * side.sign - fee_pct * (pos.entry + price) * qty
-        report.trades.append(ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason, side))
+        report.trades.append(
+            ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason, side, pos.features)
+        )
         pnls.append((ts, pnl))
         equity += pnl
         peak = max(peak, equity)
@@ -137,7 +143,7 @@ def run_backtest(
             entry = bar.open * (1 + sign * slippage_pct)
             low, high = sorted((pending.stop_loss, pending.take_profit))
             if low < entry < high:
-                position = _Position(pending, entry, bar.ts)
+                position = _Position(pending, entry, bar.ts, pending_features)
             pending = None
 
         if position is not None:
@@ -168,6 +174,9 @@ def run_backtest(
         decision = strategy.decide(window)
         if decision is None:
             continue
+        recent = bars[max(0, i - 80) : i + 1]
+        if brain is not None and not brain.allows(recent, decision.side)[0]:
+            continue  # o cérebro deixou passar
         today = day_start(bar.ts, risk.timezone)
         stats = compute_stats(trader.capital, [p for _, p in pnls], [p for ts, p in pnls if ts >= today])
         mood = compute_mood(stats.recent_outcomes, stats.day_pnl)
@@ -187,6 +196,11 @@ def run_backtest(
         audit = auditor.review(plan, ctx)
         if audit.approved:
             pending = plan
+            if record_features:
+                from .brain import features
+
+                f = features(recent, decision.side)
+                pending_features = tuple(f) if f else None
         elif any("escola" in r for r in audit.reasons):
             report.halted_at = bar.ts
             break

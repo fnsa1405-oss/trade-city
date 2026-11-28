@@ -29,6 +29,15 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
+      - name: Carregar os cérebros
+        run: |
+          if git fetch --depth=1 origin cerebros-treinados; then
+            git archive FETCH_HEAD cerebros | tar -x || echo "sem cérebros salvos"
+            ls cerebros 2>/dev/null || true
+          else
+            echo "nenhum cérebro treinado ainda"
+          fi
+
       - name: Abrir o livro de registros
         run: |
           WT="$RUNNER_TEMP/mesa-dados"

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import DonchianEnsemble, HeikinAshiTrendPullback, OpeningRangeDayTrade, Strategy, TrendFollower
+from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TrendFollower
 
 
 @dataclass(frozen=True)
@@ -107,40 +107,39 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="teo",
             name="Teo Chip",
-            persona="Disciplinado e rápido: faz day trade no Nasdaq 100 lendo 60, 15 e 5 minutos.",
+            persona="Disciplinado e rápido: faz day trade no Nasdaq 100 no rompimento da abertura.",
             symbol="QQQ",
             asset_class=AssetClass.EQUITY,
-            timeframe="5min",
-            strategy=HeikinAshiTrendPullback(),
-            data_lookback_days=25,
-            approved=True,  # escola de day trade 27/11/2026: prova com fator de lucro 2,78 (só 43 pregões de histórico)
-            atr_stop_multiple=2.0,
-            reward_ratio=50.0,  # sem alvo: sai quando o Heikin-Ashi de 15 min vira ou no fim do dia
+            timeframe="1min",
+            strategy=OpeningRangeDayTrade(15),
+            data_lookback_days=5,
+            # escola com 2 anos (27/11/2026): nenhuma estratégia de day trade passou. A melhor no
+            # treino (ORB 15 min, gatilho 1 min, alvo 2x) vai para o cérebro tentar filtrar.
+            reward_ratio=2.0,
             day_trade=True,
         ),
         TraderProfile(
             key="lena",
             name="Dona Lena",
-            persona="Paciente e experiente: faz day trade no S&P 500 e só entra a favor do 60 minutos.",
+            persona="Paciente e experiente: faz day trade no S&P 500 no rompimento da abertura.",
             symbol="SPY",
             asset_class=AssetClass.EQUITY,
             timeframe="5min",
-            strategy=HeikinAshiTrendPullback(),
-            data_lookback_days=25,
-            approved=True,  # escola de day trade 27/11/2026: prova com fator de lucro 3,06 (só 43 pregões de histórico)
-            atr_stop_multiple=2.0,
-            reward_ratio=3.0,
+            strategy=OpeningRangeDayTrade(15),
+            data_lookback_days=5,
+            reward_ratio=3.0,  # melhor no treino da escola de 2 anos; reprovada na prova
             day_trade=True,
         ),
         TraderProfile(
             key="davi",
             name="Davi Dow",
-            persona="Veterano do pregão: faz day trade no Dow Jones (DIA) lendo topos e fundos.",
+            persona="Veterano do pregão: faz day trade no Dow Jones (DIA) no rompimento da abertura.",
             symbol="DIA",
             asset_class=AssetClass.EQUITY,
             timeframe="5min",
-            strategy=OpeningRangeDayTrade(5),
-            data_lookback_days=25,
+            strategy=OpeningRangeDayTrade(15),
+            data_lookback_days=5,
+            reward_ratio=3.0,  # melhor no treino da escola de 2 anos; reprovado na prova
             day_trade=True,
         ),
         TraderProfile(
@@ -149,9 +148,10 @@ def default_traders() -> list[TraderProfile]:
             persona="Elétrico: faz day trade nas pequenas empresas americanas (Russell 2000, IWM).",
             symbol="IWM",
             asset_class=AssetClass.EQUITY,
-            timeframe="5min",
+            timeframe="1min",
             strategy=OpeningRangeDayTrade(5),
-            data_lookback_days=25,
+            data_lookback_days=5,
+            reward_ratio=2.0,  # melhor no treino da escola de 2 anos; reprovado na prova
             day_trade=True,
         ),
     ]

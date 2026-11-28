@@ -36,8 +36,10 @@ class Desk:
         ledger: Ledger,
         risk: RiskConfig | None = None,
         clock: Callable[[], datetime] = _utcnow,
+        brains: dict | None = None,
     ):
         self.traders = traders
+        self.brains = brains or {}  # cérebros promovidos na escola, por trader
         self.broker = broker
         self.ledger = ledger
         self.risk = risk or RiskConfig()
@@ -104,6 +106,14 @@ class Desk:
         if decision is None:
             return []
         reason = decision.reason
+        brain = self.brains.get(trader.key)
+        if brain is not None and brain.promoted:
+            ok, p = brain.allows(bars[-81:], decision.side)
+            detail = f"chance estimada {p:.0%}, mínimo {brain.threshold:.0%}" if p is not None else "sem histórico para avaliar"
+            self.ledger.record_decision(now, trader.key, trader.symbol, "cérebro", ok, detail)
+            if not ok:
+                return [f"[{trader.name}] cérebro deixou passar: {reason} ({detail})"]
+            reason = f"{reason} (cérebro: {detail})"
         price = self.broker.latest_price(trader.symbol, trader.asset_class)
         signal = Signal(trader.key, trader.symbol, price, reason, now, decision.side, decision.stop)
         self.ledger.record_decision(now, trader.key, trader.symbol, "analista", True, reason)

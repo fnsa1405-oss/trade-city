@@ -103,6 +103,7 @@ class ClosedTrade:
     closed_at: datetime
     exit_reason: str
     side: Side = Side.LONG
+    features: tuple | None = None  # "clima" do gráfico na entrada, para o cérebro aprender
 
     @property
     def won(self) -> bool:

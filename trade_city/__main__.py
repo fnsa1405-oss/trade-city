@@ -44,9 +44,14 @@ def _trader(key: str):
 
 
 def _desk(db: str, corretora: str = "simulada", grupo: str = "todos"):
+    from .brain import setup_of
     from .desk import Desk
 
-    approved = [t for t in default_traders() if t.approved]  # só quem passou na escola opera
+    traders = {t.key: t for t in default_traders()}
+    # cérebro treinado com outra configuração não vale
+    brains = {k: b for k, b in _load_brains().items() if k in traders and b.setup == setup_of(traders[k])}
+    # opera quem passou na escola, ou quem tem cérebro promovido (passou na prova filtrando)
+    approved = [t for t in traders.values() if t.approved or (t.key in brains and brains[t.key].promoted)]
     if grupo == "swing":
         approved = [t for t in approved if not t.strategy.day_trade]
     elif grupo == "day":
@@ -60,7 +65,78 @@ def _desk(db: str, corretora: str = "simulada", grupo: str = "todos"):
         from .broker.paper import PaperBroker
 
         broker = PaperBroker(ledger.conn, initial_cash=sum(t.capital for t in approved))
-    return Desk(approved, broker, ledger)
+    return Desk(approved, broker, ledger, brains=brains)
+
+
+def _load_brains(folder: str = "cerebros") -> dict:
+    import os
+
+    from .brain import Brain
+
+    brains = {}
+    if os.path.isdir(folder):
+        for name in os.listdir(folder):
+            if name.endswith(".json"):
+                with open(os.path.join(folder, name)) as fh:
+                    brain = Brain.from_json(fh.read())
+                brains[brain.trader] = brain
+    return brains
+
+
+def _trader_bars(trader, dados: str, days: int = 1095):
+    from .models import AssetClass
+    from .public_data import public_bars
+
+    if trader.asset_class is AssetClass.EQUITY and trader.strategy.day_trade:
+        from .history import intraday_history
+
+        return intraday_history(trader.symbol, trader.timeframe, dados)
+    return public_bars(trader.symbol, trader.asset_class, trader.timeframe, days)
+
+
+def _train_brains(traders, dados: str, folder: str) -> str:
+    import os
+
+    from .brain import FEATURE_NAMES, setup_of, train_brain
+
+    os.makedirs(folder, exist_ok=True)
+    lines = [
+        "## Treino dos cérebros",
+        "",
+        "Cada cérebro é uma rede neural pequena que estima a chance de cada oportunidade dar certo, "
+        "olhando o clima do gráfico. Treina nos 70% iniciais e só é promovido se filtrar melhor que "
+        "operar sem ele nos 30% finais. Nunca mexe nas travas de risco.",
+        "",
+        f"O que ele olha: {', '.join(FEATURE_NAMES)}.",
+        "",
+        "| Trader | Situação | Prova sem cérebro | Prova com cérebro | Limite |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for trader in traders:
+        try:
+            bars = _trader_bars(trader, dados)
+            report = run_backtest(trader, bars, RiskConfig(), record_features=True)
+            brain = train_brain(trader.key, report.trades)
+        except Exception as exc:  # um trader com problema não derruba os outros
+            lines.append(f"| {trader.name} | erro: {exc} | - | - | - |")
+            continue
+        path = os.path.join(folder, f"{trader.key}.json")
+        if brain is None:
+            if os.path.exists(path):
+                os.remove(path)
+            lines.append(f"| {trader.name} | poucas operações ({len(report.trades)}; mínimo 150) | - | - | - |")
+            continue
+        brain.setup = setup_of(trader)
+        with open(path, "w") as fh:
+            fh.write(brain.to_json())
+        r = brain.report
+        sem, com = r["prova sem cérebro"], r["prova com cérebro"]
+        status = "PROMOVIDO" if brain.promoted else "em treinamento (não melhorou a prova)"
+        lines.append(
+            f"| {trader.name} | {status} | {sem['operações']} op., FL {sem['fator de lucro']}, {sem['resultado']:+.0f} "
+            f"| {com['operações']} op., FL {com['fator de lucro']}, {com['resultado']:+.0f} | {brain.threshold:.0%} |"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def _history_note(series) -> str:
@@ -104,6 +180,10 @@ def main(argv: list[str] | None = None) -> None:
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     esc.add_argument("--dados", default="dados", help="pasta com os candles guardados pelo coletor")
+    cer = sub.add_parser("cerebros", help="treina o cérebro (rede neural) de cada trader aprovado")
+    cer.add_argument("--dados", default="dados")
+    cer.add_argument("--pasta", default="cerebros")
+    cer.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     col = sub.add_parser("coletar", help="guarda os candles de 5 e 1 min dos traders de day trade")
     col.add_argument("--dados", default="dados")
     run = sub.add_parser("rodar", help="roda a mesa (corretora simulada por padrão)")
@@ -174,6 +254,14 @@ def main(argv: list[str] | None = None) -> None:
         if args.saida:
             with open(args.saida, "w") as fh:
                 fh.write("\n".join(parts))
+        return
+
+    if args.cmd == "cerebros":
+        text = _train_brains(default_traders(), args.dados, args.pasta)
+        print(text)
+        if args.saida:
+            with open(args.saida, "w") as fh:
+                fh.write(text)
         return
 
     if args.cmd == "coletar":
