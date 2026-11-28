@@ -37,6 +37,7 @@ class _FlowStrategy(Strategy):
     """Base: calcula delta, CVD e médias uma vez para o histórico inteiro."""
 
     has_exit = True
+    uses_flow = True  # a mesa busca candles com o volume de agressão
     needs: str | None = None  # "book" ou "oi" quando precisa do livro ou dos contratos em aberto
     lookback = 260
 
@@ -319,6 +320,8 @@ class LiquidationFlush(_FlowStrategy):
 class FlowFilter(Strategy):
     """Filtro de fluxo sobre outra estratégia: só entra quando o delta somado dos últimos `n`
     candles está a favor. A saída é a da estratégia original."""
+
+    uses_flow = True
 
     def __init__(self, inner: Strategy, n: int = 20):
         self.inner = inner

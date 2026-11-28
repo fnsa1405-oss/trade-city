@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
 from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
+from .strategies.orderflow import DeltaBreakout
 
 
 @dataclass(frozen=True)
@@ -79,12 +80,19 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="bia",
             name="Bia Satoshi",
-            persona="Não dorme: vigia o Bitcoin 24h e só entra a favor da tendência.",
+            persona="Não dorme: vigia o Bitcoin 24h e só compra o rompimento quando os compradores agridem.",
             symbol="BTC/USD",
             asset_class=AssetClass.CRYPTO,
-            timeframe="1h",
-            strategy=TrendFollower(fast=20, slow=50, breakout=20),
-            data_lookback_days=10,
+            timeframe="4h",
+            strategy=DeltaBreakout(55),
+            data_lookback_days=100,
+            # escola de fluxo 28/11/2026 (Binance desde 2017): rompimento de 55 com agressão de
+            # compra, 4h; treino FL 4,71 (31 op.), prova FL 1,25 (26 op., +2,3%)
+            approved=True,
+            risk_weight=1.4,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="bia",
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 27 candles
         ),
         TraderProfile(
             key="edu",
@@ -107,6 +115,8 @@ def default_traders() -> list[TraderProfile]:
             data_lookback_days=90,
             # escola 28/11/2026 (~5 anos de histórico): momento de série temporal 28, prova com fator de lucro 1,62
             approved=True,
+            risk_weight=1.4,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="sol",
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai quando o retorno de 28 dias fica negativo
         ),
@@ -119,23 +129,29 @@ def default_traders() -> list[TraderProfile]:
             timeframe="4h",
             strategy=DonchianEnsemble(),
             data_lookback_days=100,  # 561 candles de 4h para os canais de até 360 candles
-            approved=True,  # escola 27/11/2026 (2ª rodada): Donchian em conjunto, prova com fator de lucro 2,09
+            approved=True,
+            risk_weight=1.4,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="rui",  # escola 27/11/2026 (2ª rodada): Donchian em conjunto, prova com fator de lucro 2,09
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai quando a maioria dos canais sai
         ),
         TraderProfile(
             key="dora",
             name="Dora Doge",
-            persona="A mais animada do escritório: segue a maioria dos canais no Dogecoin.",
+            persona="A mais animada do escritório: compra o Dogecoin quando ele rompe com agressão de compra.",
             symbol="DOGE/USD",
             asset_class=AssetClass.CRYPTO,
             timeframe="4h",
-            strategy=DonchianEnsemble(),
+            strategy=DeltaBreakout(20),
             data_lookback_days=100,
-            # escola 28/11/2026 (~5 anos de histórico): Donchian em conjunto 4h, prova com fator de lucro 1,17
+            # escola de fluxo 28/11/2026 (Binance desde 2019): rompimento de 20 com agressão, 4h;
+            # treino FL 5,19 (37 op.), prova FL 1,82 (18 op., +4,2%). Trocou o Donchian em
+            # conjunto (prova FL 1,17), que ficou atrás no treino e na prova.
             approved=True,
+            risk_weight=1.4,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="dora",
             atr_stop_multiple=2.0,
-            reward_ratio=50.0,  # sem alvo: sai quando a maioria dos canais sai
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 candles
         ),
         TraderProfile(
             key="teo",
@@ -149,6 +165,8 @@ def default_traders() -> list[TraderProfile]:
             # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 1,42.
             # No day trade (2 anos, 228 combinações) nada passou na prova.
             approved=True,
+            risk_weight=0.47,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="indices",
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),
@@ -164,6 +182,8 @@ def default_traders() -> list[TraderProfile]:
             # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 1,59.
             # No day trade (2 anos, 228 combinações) nada passou na prova.
             approved=True,
+            risk_weight=0.47,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="indices",
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),
@@ -179,6 +199,8 @@ def default_traders() -> list[TraderProfile]:
             # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 2,21.
             # No day trade (2 anos, 228 combinações) nada passou na prova.
             approved=True,
+            risk_weight=0.47,  # carteira 28/11/2026: paridade de risco (ver carteira.py)
+            group="indices",
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),

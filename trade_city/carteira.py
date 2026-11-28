@@ -173,13 +173,22 @@ def evaluate_levels(
 def _bars_for(trader: TraderProfile, days: int):
     from .public_data import public_bars
 
+    if trader.asset_class is AssetClass.CRYPTO and getattr(trader.strategy, "uses_flow", False):
+        from datetime import datetime, timezone
+
+        from .orderflow import binance_symbol, vision_klines
+
+        today = datetime.now(timezone.utc).date()
+        interval = {"1h": "1h", "4h": "4h", "1d": "1d"}[trader.timeframe]
+        return vision_klines(binance_symbol(trader.symbol), interval, today - timedelta(days=days), today - timedelta(days=1))
     if trader.asset_class is AssetClass.CRYPTO:
         return public_bars(trader.symbol, trader.asset_class, trader.timeframe, days)
     return public_bars(trader.symbol, trader.asset_class, trader.timeframe, max(days, 3650))
 
 
 def portfolio_report(traders: Sequence[TraderProfile], days: int = 2900, bars_for=_bars_for) -> tuple[str, dict]:
-    approved = [t for t in traders if t.approved]
+    # pesos e grupos atuais ficam de fora: a carteira recalcula tudo do zero
+    approved = [replace(t, risk_weight=1.0, group="") for t in traders if t.approved]
     bars = {t.key: bars_for(t, days) for t in approved}
     approved = [t for t in approved if bars.get(t.key)]
     names = {t.key: t.name for t in approved}

@@ -178,7 +178,12 @@ def _flow_school(trader, args) -> str:
             return f"### {trader.name} ({trader.symbol})\n\nSem histórico de fluxo (rode fluxo-historico).\n"
         results = evaluate_flow(trader, series)
         note = "Fluxo real da Binance: " + "; ".join(f"{tf} {len(b)} candles desde {b[0].ts:%m/%Y}" for tf, b in series.items() if b) + ". Custo: 0,1% de taxa + 0,05% de derrapagem por lado.\n"
-        return report_markdown(trader, results) + ranking_markdown(results) + note
+        check = ""
+        if trader.approved:
+            from .school import current_check
+
+            check = current_check(trader, series)
+        return report_markdown(trader, results) + ranking_markdown(results) + check + note
     from .history import DAY_TIMEFRAMES, intraday_history
     from .school import with_15min
 
@@ -349,7 +354,9 @@ def main(argv: list[str] | None = None) -> None:
                         "1h": public_bars(trader.symbol, trader.asset_class, "1h", 729),
                     }
                 section = report_markdown(trader, evaluate(trader, series, fine=series.get("1min"))) + note
-                if trader.approved:
+                if trader.approved and getattr(trader.strategy, "uses_flow", False):
+                    section += "Estratégia atual é de fluxo de ordens: conferida na Escola de fluxo (dados da Binance).\n"
+                elif trader.approved:
                     section += current_check(trader, series, fine=series.get("1min"))
             except Exception as exc:  # um ativo com problema não derruba os outros
                 section = f"### {trader.name} ({trader.symbol})\n\nErro ao testar: {exc}\n"

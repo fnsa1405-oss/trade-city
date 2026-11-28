@@ -89,7 +89,7 @@ class Desk:
     def _run_trader(self, trader: TraderProfile) -> list[str]:
         now = self.clock()
         open_trade = self.ledger.open_trade_for(trader.key)
-        bars = self.broker.get_bars(trader.symbol, trader.asset_class, trader.timeframe, trader.data_lookback_days)
+        bars = self._bars(trader)
         if open_trade is not None:
             return self._manage(trader, open_trade, bars)
         if not bars:
@@ -195,6 +195,20 @@ class Desk:
             f"[{trader.name}] {verb} {qty:g} {trader.symbol} a {fill.price:.2f} ({mode}), "
             f"stop {plan.stop_loss:.2f}, alvo {plan.take_profit:.2f}"
         ]
+
+    def _bars(self, trader: TraderProfile):
+        """Candles do trader. Estratégia de fluxo em cripto: candles da Binance com o volume de
+        agressão (o mesmo dado da escola de fluxo); se falhar, os candles da corretora."""
+        if getattr(trader.strategy, "uses_flow", False) and trader.asset_class is AssetClass.CRYPTO:
+            try:
+                from .orderflow import live_flow_bars
+
+                bars = live_flow_bars(trader.symbol, trader.timeframe, max(trader.strategy.window + 50, 300))
+                if bars:
+                    return bars
+            except Exception:
+                pass
+        return self.broker.get_bars(trader.symbol, trader.asset_class, trader.timeframe, trader.data_lookback_days)
 
     def _portfolio_risk(self, trader: TraderProfile) -> dict:
         """Risco aberto (até o stop) de toda a mesa e do grupo correlacionado do trader."""
