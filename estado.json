@@ -1,7 +1,7 @@
 {
  "versao": 1,
  "mesa": "swing",
- "gerado_em": "2026-11-28T10:16:59+00:00",
+ "gerado_em": "2026-11-28T10:18:41+00:00",
  "modo": "simulado",
  "travada": false,
  "travas": {
@@ -15,6 +15,30 @@
   "resultado": 0.0
  },
  "traders": [
+  {
+   "key": "bia",
+   "nome": "Bia Satoshi",
+   "ativo": "BTC/USD",
+   "classe": "crypto",
+   "tempo": "4h",
+   "estrategia": "Rompimento com agressão (55)",
+   "persona": "Não dorme: vigia o Bitcoin 24h e só compra o rompimento quando os compradores agridem.",
+   "humor": "normal",
+   "capital_inicial": 10000.0,
+   "capital": 10000.0,
+   "pico": 10000.0,
+   "lucro": 0.0,
+   "hoje": {
+    "vitorias": 0,
+    "derrotas": 0,
+    "resultado": 0.0,
+    "meta_vitorias": 10,
+    "max_derrotas": 5
+   },
+   "ultimo_candle": "2026-11-28T04:00:00+00:00",
+   "ultimos": [],
+   "posicao": null
+  },
   {
    "key": "sol",
    "nome": "Sol Ventura",
@@ -69,8 +93,8 @@
    "ativo": "DOGE/USD",
    "classe": "crypto",
    "tempo": "4h",
-   "estrategia": "Donchian em conjunto (Zarattini/Pagani/Barbon)",
-   "persona": "A mais animada do escritório: segue a maioria dos canais no Dogecoin.",
+   "estrategia": "Rompimento com agressão (20)",
+   "persona": "A mais animada do escritório: compra o Dogecoin quando ele rompe com agressão de compra.",
    "humor": "normal",
    "capital_inicial": 10000.0,
    "capital": 10000.0,
@@ -167,7 +191,7 @@
    "key": "bia",
    "nome": "Bia Satoshi",
    "ativo": "BTC/USD",
-   "situacao": "na escola"
+   "situacao": "na mesa"
   },
   {
    "key": "edu",
