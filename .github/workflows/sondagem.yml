@@ -1,0 +1,21 @@
+name: Sondagem de dados de fluxo
+
+# Confere quais fontes de livro de ofertas e negócios respondem de dentro do GitHub Actions.
+on:
+  push:
+    branches: [claude/project-thread-2g5nrt]
+    paths: [".github/scripts/sondagem.py", ".github/workflows/sondagem.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sondagem:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+        run: python3 .github/scripts/sondagem.py | tee -a "$GITHUB_STEP_SUMMARY"
