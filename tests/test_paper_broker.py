@@ -150,3 +150,27 @@ def test_desk_runs_on_paper_broker():
     clock.now = T0 + timedelta(minutes=30)
     events = desk.run_once()
     assert ledger.open_trade_for("rui") is None, events
+
+
+def test_micro_contract_prices_costs_and_margin():
+    """MYM no DIA: preço x 50 (US$ por contrato), 1 tick + corretagem por lado, reserva só a margem."""
+    import sqlite3
+
+    from trade_city.futures import MICROS
+    from trade_city.models import AssetClass, Side, Signal, TradePlan
+
+    feed, clock = FakeFeed(price=400.0), Clock(T0)
+    mym = MICROS["DIA"]
+    broker = PaperBroker(sqlite3.connect(":memory:"), feed=feed, initial_cash=10_000, clock=clock, contracts={"DIA": mym})
+    assert broker.contract_for("DIA") is mym and broker.latest_price("DIA", AssetClass.EQUITY) == 400.0 * mym.scale
+    price = 400.0 * mym.scale
+    sig = Signal("mia", "DIA", price, "teste", T0, Side.LONG, price - 100)
+    plan = TradePlan(sig, 2, price - 100, price + 300, 200, "normal")
+    fill = broker.submit_entry(plan, AssetClass.EQUITY)
+    cost = mym.slip_value + mym.fee
+    assert fill.price == price + cost
+    assert broker.buying_power() == 10_000 - 2 * mym.margin
+    feed.price = 402.0
+    out = broker.close_position("DIA")
+    assert out.price == 402.0 * mym.scale - cost
+    assert broker.buying_power() == pytest.approx(10_000 + 2 * (out.price - fill.price))

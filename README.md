@@ -17,14 +17,37 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Rui Xis (`rui`) | XRP/USD | 4h | Donchian em conjunto (Zarattini/Pagani/Barbon), stop 2 ATR | aprovado na escola |
 | Teo Chip (`teo`) | QQQ (Nasdaq 100) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 1,42) |
 | Dona Lena (`lena`) | SPY (S&P 500) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovada em 28/11/2026 (prova: fator de lucro 1,59) |
-| Bia Satoshi (`bia`) | BTC/USD | - | - | na escola |
+| Bia Satoshi (`bia`) | BTC/USD | 4h | Rompimento de 55 com agressão de compra (fluxo de ordens) | aprovada em 28/11/2026 na escola de fluxo (prova: fator de lucro 1,25) |
 | Edu Éter (`edu`) | ETH/USD | - | - | na escola |
 | Sol Ventura (`sol`) | SOL/USD | diário | Momento de série temporal 28 | aprovada em 28/11/2026 (prova: fator de lucro 1,62) |
-| Dora Doge (`dora`) | DOGE/USD | 4h | Donchian em conjunto | aprovada em 28/11/2026 (prova: fator de lucro 1,17) |
+| Dora Doge (`dora`) | DOGE/USD | 4h | Rompimento de 20 com agressão de compra (fluxo de ordens) | aprovada em 28/11/2026 na escola de fluxo (prova: fator de lucro 1,82; antes Donchian, 1,17) |
 | Davi Dow (`davi`) | DIA (Dow Jones) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 2,21) |
+| Mia Média (`mia`) | MYM (micro do Dow) | day trade, gatilho 2 min | Médias 200/50/20/9 empilhadas em 60/15/5 min + candle de força | aprovada em 28/11/2026 (prova: fator de lucro 1,34) |
+| Flora Fluxo (`flora`) | MES (micro do S&P 500) | day trade, gatilho 1 min | ORB 15 min com delta a favor, alvo 3x | aprovada em 28/11/2026 na escola de fluxo (prova: fator de lucro 1,23) |
 | Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade, gatilho 1 min | ORB 5 min, alvo 2x | na escola (o cérebro tenta filtrar) |
 
-Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova (27/11/2026). A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
+Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova em 27/11/2026; em 28/11/2026, com microcontratos, passaram Mia e Flora, que operam na Mesa day trade simulada. A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
+
+## Fluxo de ordens (order flow)
+
+Delta (agressão de compra menos de venda), CVD, absorção, livro de ofertas e contratos em aberto (`trade_city/orderflow.py`, `trade_city/strategies/orderflow.py`).
+
+- **Criptos, de graça**: os arquivos públicos da Binance ([data.binance.vision](https://data.binance.vision)) trazem o volume de agressão de cada candle desde 2017-2020, os contratos em aberto dos futuros a cada 5 min desde 2021 e o livro dos futuros (faixas de 1% a 5%) a cada ~30 s desde 2023. **Actions > Escola de fluxo** baixa e completa esse histórico no branch `dados-fluxo` e roda a escola com as mesmas regras e custos.
+- **Livro ao vivo**: **Actions > Coleta do livro** fotografa o livro completo da Coinbase e soma as agressões da Coinbase e da Binance a cada 15 s, uma linha por minuto (`dados-fluxo/livro/`), em turnos encadeados.
+- **Índices (MNQ, MES, MYM, M2K)**: o fluxo real da CME é pago (Databento, Rithmic, CQG) e o plano da Massive não inclui negócios. O delta é **estimado** pelos candles de 1 e 5 min (classificação de volume em bloco, Easley, López de Prado e O'Hara, 2012).
+- A API principal da Binance e a da Bybit bloqueiam os servidores do GitHub (EUA); o `data-api.binance.vision` funciona e é o que a mesa usa ao vivo.
+
+Escola de fluxo (28/11/2026): aprovadas Bia (BTC, rompimento 55 com agressão, 4h) e Dora (DOGE, rompimento 20 com agressão, 4h, trocou o Donchian). Sol e Rui também passaram, mas ficaram atrás das estratégias atuais e seguem com elas. No day trade com microcontratos, o ORB de 15 min com delta passou no SPY/MES (prova: 54 operações, fator de lucro 1,23); o encaixe na mesa de day trade fica com o trabalho dos microcontratos.
+
+## Gestão de carteira
+
+`python -m trade_city carteira` (ou **Actions > Carteira**), em `trade_city/carteira.py`:
+
+- **Correlação** dos resultados diários: QQQ, SPY e DIA formam um grupo (até 0,63); as criptos quase não se correlacionam entre si nem com os índices.
+- **Paridade de risco**: cada grupo recebe a mesma fatia de risco e, dentro dele, o inverso da volatilidade. Resultado: cada cripto com peso 1,4 e cada índice com 0,47 (o risco por operação é multiplicado pelo peso). Com os pesos, a carteira rendeu +6,5% ao ano no treino e +1,8% na prova, contra +4,8% e +1,0% com todos iguais.
+- **Risco por operação**: calibrado de 0,25% a 2% com o backtest completo. 0,5% continua o escolhido: acima disso a trava de queda de 10% para Rui e Bia (o trader volta para a escola). A queda da carteira inteira fica pequena (até 8% em 2%), então o limite hoje é a trava por trader, não a carteira.
+- **Limites da carteira** no Auditor: risco aberto somado até 3% do capital total e até 1,5% por grupo correlacionado.
+- **Fim de semana** (pedido do Alexandre): no sábado e domingo de Nova York, com a bolsa fechada, as criptos operam com 1,5x o risco (`weekend_crypto_boost`). Na calibração com Bia e Dora novas, 1,5x subiu a prova de +1,8% para +2,3% ao ano com queda de 2,6%; 2x piorou o retorno por queda no treino.
 
 ## App da mesa ao vivo (celular)
 
@@ -146,6 +169,8 @@ Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 
 | Fibonacci 38-62% | retração clássica | 60 e 15 min a favor; recuo à zona de 38,2-61,8% do último impulso; stop em 78,6% | [Investopedia](https://www.investopedia.com/terms/f/fibonacciretracement.asp) |
 
 **Wyckoff** (apostila enviada pelo Alexandre em 28/11/2026, regras em `strategies/wyckoff.py`): spring/upthrust (com e sem volume baixo), SOS + LPS e clímax (SC/BC) com absorção. Faixa = máxima/mínima de 40 candles com altura até 6 ATR; barra larga = 1,8x a amplitude média; volume alto = 1,5x a média de 60 candles, ultra-alto = 2x. Ficaram de fora as partes subjetivas (rotular as fases A a E, linhas desenhadas à mão, Market Profile).
+
+**A favor das médias (pedido do Alexandre em 28/11/2026, `strategies/medias.py`):** só compra quando, em cada tempo de contexto, MME9 > MMA20 > MMA50 > MMA200 (inverso para vender). A escola testa três combinações de contexto (60/15/5, 60/15 e 15/5 min). O gatilho sai no gráfico de 2 minutos, num candle que toca a MME9 ou a MMA20: Ponto Contínuo, PFR (mínima abaixo da anterior e fechamento acima do anterior), engolfo, martelo ou candle de força (corpo de 70% e amplitude de 1,5x a média). Entra no rompimento do candle gatilho, stop no outro extremo, e sai se o 2 min fechar do outro lado da MMA20. Os candles de 2, 5, 15 e 60 min são montados a partir do 1 min.
 
 **Swing nos índices:** os mesmos setups também rodam em swing (60 min e diário, pode dormir posicionado). A confluência passa a ser o tempo gráfico de cima: o diário para o 60 min e o semanal para o diário. Para testar: Actions > Escola > modo `swing`.
 

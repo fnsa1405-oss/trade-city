@@ -89,7 +89,7 @@ class Desk:
     def _run_trader(self, trader: TraderProfile) -> list[str]:
         now = self.clock()
         open_trade = self.ledger.open_trade_for(trader.key)
-        bars = self.broker.get_bars(trader.symbol, trader.asset_class, trader.timeframe, trader.data_lookback_days)
+        bars = self._bars(trader)
         if open_trade is not None:
             return self._manage(trader, open_trade, bars)
         if not bars:
@@ -158,7 +158,9 @@ class Desk:
         stats = self.stats(trader)
         mood = self.mood(stats)
         risk = risk_for(trader, self.risk)
-        plan, detail = Guardian(risk).plan(signal, bars, stats.capital, mood, trader.asset_class)
+        micro = self.broker.contract_for(trader.symbol)
+        margin = micro.margin if micro is not None else None
+        plan, detail = Guardian(risk).plan(signal, bars, stats.capital, mood, trader.asset_class, unit_margin=margin)
         self.ledger.record_decision(now, trader.key, trader.symbol, "guardião", plan is not None, detail)
         if plan is None:
             return events + [f"[{trader.name}] guardião recusou: {detail}"]
@@ -173,6 +175,9 @@ class Desk:
             buying_power=self.broker.buying_power(),
             kill_switch=self.ledger.kill_switch,
             market_open=self.broker.is_market_open(trader.asset_class),
+            asset_class=trader.asset_class,
+            **self._portfolio_risk(trader),
+            unit_margin=margin,
         )
         audit = Auditor(risk).review(plan, ctx)
         self.ledger.record_decision(
@@ -189,10 +194,39 @@ class Desk:
         )
         mode = "simulado" if self.broker.paper else "REAL"
         verb = "comprou" if plan.side is Side.LONG else "vendeu a descoberto"
+        what = f"{micro.code} (microcontrato)" if micro is not None else trader.symbol
         return events + [
-            f"[{trader.name}] {verb} {qty:g} {trader.symbol} a {fill.price:.2f} ({mode}), "
+            f"[{trader.name}] {verb} {qty:g} {what} a {fill.price:.2f} ({mode}), "
             f"stop {plan.stop_loss:.2f}, alvo {plan.take_profit:.2f}"
         ]
+
+    def _bars(self, trader: TraderProfile):
+        """Candles do trader. Estratégia de fluxo em cripto: candles da Binance com o volume de
+        agressão (o mesmo dado da escola de fluxo); se falhar, os candles da corretora."""
+        if getattr(trader.strategy, "uses_flow", False) and trader.asset_class is AssetClass.CRYPTO:
+            try:
+                from .orderflow import live_flow_bars
+
+                bars = live_flow_bars(trader.symbol, trader.timeframe, max(trader.strategy.window + 50, 300))
+                if bars:
+                    return bars
+            except Exception:
+                pass
+        return self.broker.get_bars(trader.symbol, trader.asset_class, trader.timeframe, trader.data_lookback_days)
+
+    def _portfolio_risk(self, trader: TraderProfile) -> dict:
+        """Risco aberto (até o stop) de toda a mesa e do grupo correlacionado do trader."""
+        total = group = 0.0
+        for other in self.traders:
+            trade = self.ledger.open_trade_for(other.key)
+            if trade is None:
+                continue
+            risk = abs(trade.entry_price - trade.stop_loss) * trade.qty
+            total += risk
+            if trader.group and other.group == trader.group:
+                group += risk
+        capital = sum(t.capital for t in self.traders)
+        return {"portfolio_capital": capital, "portfolio_open_risk": total, "group_open_risk": group}
 
     def _manage(self, trader: TraderProfile, trade: OpenTrade, bars) -> list[str]:
         """5. Placar: acompanha a posição aberta e registra o resultado quando ela fecha."""
