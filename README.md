@@ -147,6 +147,8 @@ Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 
 
 **Wyckoff** (apostila enviada pelo Alexandre em 28/11/2026, regras em `strategies/wyckoff.py`): spring/upthrust (com e sem volume baixo), SOS + LPS e clímax (SC/BC) com absorção. Faixa = máxima/mínima de 40 candles com altura até 6 ATR; barra larga = 1,8x a amplitude média; volume alto = 1,5x a média de 60 candles, ultra-alto = 2x. Ficaram de fora as partes subjetivas (rotular as fases A a E, linhas desenhadas à mão, Market Profile).
 
+**A favor das médias (pedido do Alexandre em 28/11/2026, `strategies/medias.py`):** só compra quando, em cada tempo de contexto, MME9 > MMA20 > MMA50 > MMA200 (inverso para vender). A escola testa três combinações de contexto (60/15/5, 60/15 e 15/5 min). O gatilho sai no gráfico de 2 minutos, num candle que toca a MME9 ou a MMA20: Ponto Contínuo, PFR (mínima abaixo da anterior e fechamento acima do anterior), engolfo, martelo ou candle de força (corpo de 70% e amplitude de 1,5x a média). Entra no rompimento do candle gatilho, stop no outro extremo, e sai se o 2 min fechar do outro lado da MMA20. Os candles de 2, 5, 15 e 60 min são montados a partir do 1 min.
+
 **Swing nos índices:** os mesmos setups também rodam em swing (60 min e diário, pode dormir posicionado). A confluência passa a ser o tempo gráfico de cima: o diário para o 60 min e o semanal para o diário. Para testar: Actions > Escola > modo `swing`.
 
 Nos gatilhos de 5 e 15 min, a escola confere entrada, stop e alvo minuto a minuto com os candles de 1 min. Sem isso, num candle que fez a mínima e depois rompeu a máxima, não dá para saber se o stop veio antes da entrada.
