@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .config import RiskConfig
-from .models import AuditResult, TradePlan
+from .models import AuditResult, Side, TradePlan
 from .mood import Mood
 
 
@@ -18,6 +18,7 @@ class AuditContext:
     buying_power: float
     kill_switch: bool = False
     market_open: bool = True
+    unit_margin: float | None = None  # micro futuros: margem por contrato (no lugar do valor cheio)
 
 
 class Auditor:
@@ -35,19 +36,26 @@ class Auditor:
         if ctx.has_open_position:
             reasons.append("já existe posição aberta neste ativo")
 
-        if not (0 < plan.stop_loss < plan.entry < plan.take_profit):
+        if plan.side is Side.LONG:
+            coherent = 0 < plan.stop_loss < plan.entry < plan.take_profit
+        else:
+            coherent = 0 < plan.take_profit < plan.entry < plan.stop_loss
+        if not coherent:
             reasons.append("stop loss e stop gain incoerentes com a entrada")
         elif plan.reward_ratio < cfg.min_reward_ratio - 1e-9:
             reasons.append(f"alvo de {plan.reward_ratio:.2f}x o risco, mínimo {cfg.min_reward_ratio}x")
 
         max_risk = ctx.capital * cfg.risk_per_trade * Mood.CONFIANTE.size_multiplier
+        if ctx.unit_margin and plan.qty == 1:
+            max_risk = max(max_risk, ctx.capital * cfg.max_contract_risk)  # 1 micro contrato
         if plan.risk_amount > max_risk * 1.01:  # folga para arredondamento de centavos
             reasons.append(f"risco de {plan.risk_amount:.2f} acima do máximo de {max_risk:.2f}")
         if plan.qty <= 0:
             reasons.append("quantidade inválida")
-        if plan.notional > ctx.buying_power + 1e-6:
+        exposure = plan.qty * ctx.unit_margin if ctx.unit_margin else plan.notional
+        if exposure > ctx.buying_power + 1e-6:
             reasons.append("poder de compra insuficiente")
-        if plan.notional > ctx.capital + 1e-6:
+        if exposure > ctx.capital + 1e-6:
             reasons.append("posição maior que o capital do trader")
 
         if ctx.day_losses >= cfg.max_daily_losses:

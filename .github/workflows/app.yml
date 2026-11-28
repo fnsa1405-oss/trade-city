@@ -1,0 +1,37 @@
+name: Publicar o app
+
+# Publica a pasta app/ no GitHub Pages: https://fnsa1405-oss.github.io/trade-city/
+# O app não guarda dados: ele lê o estado.json dos branches da mesa direto do GitHub,
+# então só precisa ser publicado de novo quando o próprio app muda.
+# Primeira vez: Settings > Pages > Source: "GitHub Actions".
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/app.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Carimbar a versão (para o celular baixar a nova)
+        run: sed -i "s/__VERSAO__/${GITHUB_SHA::7}/g" app/sw.js app/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+      - id: deploy
+        uses: actions/deploy-pages@v4

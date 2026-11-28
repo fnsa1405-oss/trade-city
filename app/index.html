@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trade City</title>
+<meta name="description" content="A mesa da Trade City ao vivo: placar, operações e botão de pânico.">
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trade City">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icones/icone-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css?v=__VERSAO__">
+</head>
+<body>
+<div class="app">
+
+  <header class="topo">
+    <div class="marca">
+      <img src="icones/icone.svg" alt="" width="30" height="30">
+      <div>
+        <strong>Trade City</strong>
+        <span id="modo">mesa simulada</span>
+      </div>
+    </div>
+    <div class="status" id="status" data-estado="carregando">
+      <i></i><span>conectando</span>
+    </div>
+  </header>
+
+  <!-- Palco do escritório. O 3D (app/escritorio/escritorio.js) monta aqui quando existir. -->
+  <section class="palco" id="escritorio" aria-label="Escritório da Trade City">
+    <div class="palco-fundo" aria-hidden="true">
+      <div class="ceu"></div>
+      <div class="predios"></div>
+      <div class="janela-luz"></div>
+    </div>
+    <div class="palco-info">
+      <span class="rotulo">Resultado da mesa</span>
+      <strong class="valor-grande" id="resultado-total">US$ 0,00</strong>
+      <span class="sub" id="resultado-sub">desde o início da fase simulada</span>
+    </div>
+  </section>
+
+  <section class="kpis" aria-label="Resumo">
+    <div class="kpi"><span>Capital</span><strong id="k-capital">–</strong></div>
+    <div class="kpi"><span>Hoje</span><strong id="k-hoje">–</strong></div>
+    <div class="kpi"><span>Operações</span><strong id="k-ops">–</strong></div>
+    <div class="kpi"><span>Acerto</span><strong id="k-acerto">–</strong></div>
+  </section>
+
+  <section class="bloco">
+    <div class="bloco-topo">
+      <h2>Na mesa agora</h2>
+      <span class="dica" id="proxima">próxima rodada em –</span>
+    </div>
+    <div id="traders" class="traders"></div>
+  </section>
+
+  <section class="bloco">
+    <div class="bloco-topo">
+      <h2>Acontecendo</h2>
+      <span class="dica" id="atualizado">–</span>
+    </div>
+    <ol id="feed" class="feed"></ol>
+  </section>
+
+  <section class="bloco">
+    <div class="bloco-topo"><h2>Operações</h2><span class="dica" id="ops-dica"></span></div>
+    <div id="operacoes" class="operacoes"></div>
+  </section>
+
+  <section class="bloco">
+    <div class="bloco-topo"><h2>Elenco</h2><span class="dica">quem opera e quem estuda</span></div>
+    <div id="elenco" class="elenco"></div>
+  </section>
+
+  <footer class="rodape">
+    Dinheiro de mentira, preços reais. Nada aqui é recomendação de investimento.
+    <button class="link" id="abrir-ajustes" type="button">Ajustes</button>
+  </footer>
+</div>
+
+<!-- Barra de pânico fixa -->
+<div class="barra-panico" id="barra-panico">
+  <div class="barra-estado"><i></i><span id="barra-texto">OPERANDO</span></div>
+  <button id="btn-panico" type="button" class="btn-panico">PARAR TUDO</button>
+</div>
+
+<!-- Folha de confirmação do pânico -->
+<div class="folha" id="folha-panico" hidden>
+  <div class="folha-caixa" role="dialog" aria-modal="true" aria-labelledby="fp-titulo">
+    <div class="alca"></div>
+    <h3 id="fp-titulo">Parar a mesa inteira?</h3>
+    <p id="fp-texto">Todas as posições abertas são zeradas e nenhum trader abre operação nova até você liberar.</p>
+    <div class="folha-acoes">
+      <button type="button" class="btn-secundario" data-fechar>Cancelar</button>
+      <button type="button" class="btn-perigo" id="fp-confirmar">Sim, parar tudo</button>
+    </div>
+    <p class="nota" id="fp-nota"></p>
+  </div>
+</div>
+
+<!-- Ajustes: chave para o botão funcionar direto do app -->
+<div class="folha" id="folha-ajustes" hidden>
+  <div class="folha-caixa" role="dialog" aria-modal="true" aria-labelledby="fa-titulo">
+    <div class="alca"></div>
+    <h3 id="fa-titulo">Botão de pânico direto</h3>
+    <p>Sem chave, o botão abre a página do GitHub e você toca em <b>Run workflow</b>. Com uma chave, ele dispara sozinho, em um toque.</p>
+    <ol class="passos">
+      <li>No GitHub: foto do perfil › <b>Settings</b> › <b>Developer settings</b> › <b>Fine-grained tokens</b> › <b>Generate new token</b>.</li>
+      <li>Em <b>Repository access</b>, escolha só <b>trade-city</b>.</li>
+      <li>Em <b>Permissions</b>, <b>Actions</b>: <b>Read and write</b>. Mais nada.</li>
+      <li>Gere, copie e cole aqui. A chave fica só neste celular.</li>
+    </ol>
+    <input id="fa-chave" type="password" autocomplete="off" placeholder="github_pat_..." spellcheck="false">
+    <div class="folha-acoes">
+      <button type="button" class="btn-secundario" id="fa-apagar">Apagar chave</button>
+      <button type="button" class="btn-primario" id="fa-salvar">Salvar</button>
+    </div>
+    <p class="nota" id="fa-nota"></p>
+  </div>
+</div>
+
+<div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="app.js?v=__VERSAO__"></script>
+</body>
+</html>

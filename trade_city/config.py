@@ -4,12 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import Strategy, TrendFollower, TurtleBreakout
+from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
 
 
 @dataclass(frozen=True)
 class RiskConfig:
     risk_per_trade: float = 0.005  # 0,5% do capital do trader por operação
+    # micro futuros: se nem 1 contrato cabe no risco normal, aceita 1 contrato desde que o
+    # risco dele não passe disto (senão a operação é recusada)
+    max_contract_risk: float = 0.01
     atr_period: int = 14
     atr_stop_multiple: float = 2.0  # stop a 2 ATR da entrada
     reward_ratio: float = 2.0  # alvo = 2x o risco
@@ -36,6 +39,7 @@ class TraderProfile:
     approved: bool = False  # só traders aprovados na escola operam na mesa
     atr_stop_multiple: float | None = None  # ajuste de stop aprovado na escola (None = padrão)
     reward_ratio: float | None = None  # ajuste de alvo aprovado na escola (None = padrão)
+    day_trade: bool = False  # True = a escola testa só day trade (gatilho de 5 ou 1 min)
 
 
 def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:
@@ -73,12 +77,16 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="sol",
             name="Sol Ventura",
-            persona="Rápida e ousada: vive no ritmo da Solana.",
+            persona="Rápida e ousada: compra a Solana quando o retorno de 28 dias vira positivo.",
             symbol="SOL/USD",
             asset_class=AssetClass.CRYPTO,
-            timeframe="1h",
-            strategy=TrendFollower(fast=20, slow=50, breakout=20),
-            data_lookback_days=10,
+            timeframe="1d",
+            strategy=TimeSeriesMomentum(28),
+            data_lookback_days=90,
+            # escola 28/11/2026 (~5 anos de histórico): momento de série temporal 28, prova com fator de lucro 1,62
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando o retorno de 28 dias fica negativo
         ),
         TraderProfile(
             key="rui",
@@ -87,46 +95,81 @@ def default_traders() -> list[TraderProfile]:
             symbol="XRP/USD",
             asset_class=AssetClass.CRYPTO,
             timeframe="4h",
-            strategy=TrendFollower(fast=10, slow=30, breakout=10),
-            data_lookback_days=15,
-            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,51
-            atr_stop_multiple=1.5,
-            reward_ratio=3.0,
+            strategy=DonchianEnsemble(),
+            data_lookback_days=100,  # 561 candles de 4h para os canais de até 360 candles
+            approved=True,  # escola 27/11/2026 (2ª rodada): Donchian em conjunto, prova com fator de lucro 2,09
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando a maioria dos canais sai
         ),
         TraderProfile(
             key="dora",
             name="Dora Doge",
-            persona="A mais animada do escritório: opera Dogecoin com stop sempre apertado.",
+            persona="A mais animada do escritório: segue a maioria dos canais no Dogecoin.",
             symbol="DOGE/USD",
             asset_class=AssetClass.CRYPTO,
-            timeframe="1h",
-            strategy=TrendFollower(fast=20, slow=50, breakout=20),
-            data_lookback_days=10,
+            timeframe="4h",
+            strategy=DonchianEnsemble(),
+            data_lookback_days=100,
+            # escola 28/11/2026 (~5 anos de histórico): Donchian em conjunto 4h, prova com fator de lucro 1,17
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando a maioria dos canais sai
         ),
         TraderProfile(
             key="teo",
             name="Teo Chip",
-            persona="Disciplinado como os Turtles: opera o Nasdaq 100 no rompimento de 20 dias.",
+            persona="Disciplinado e paciente: compra o Nasdaq 100 quando rompe a máxima de 20 dias.",
             symbol="QQQ",
             asset_class=AssetClass.EQUITY,
             timeframe="1d",
-            strategy=TurtleBreakout(entry=20, exit=10),
-            data_lookback_days=60,
-            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,42
+            strategy=TurtleBreakout(20, 10),
+            data_lookback_days=90,
+            # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 1,42.
+            # No day trade (2 anos, 228 combinações) nada passou na prova.
+            approved=True,
             atr_stop_multiple=2.0,
-            reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),
         TraderProfile(
             key="lena",
             name="Dona Lena",
-            persona="Paciente e experiente: segue o S&P 500 com o sistema 1 dos Turtles.",
+            persona="Paciente e experiente: compra o S&P 500 quando rompe a máxima de 20 dias.",
             symbol="SPY",
             asset_class=AssetClass.EQUITY,
             timeframe="1d",
-            strategy=TurtleBreakout(entry=20, exit=10),
-            data_lookback_days=60,
-            approved=True,  # escola 27/11/2026: prova com fator de lucro 1,59
+            strategy=TurtleBreakout(20, 10),
+            data_lookback_days=90,
+            # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 1,59.
+            # No day trade (2 anos, 228 combinações) nada passou na prova.
+            approved=True,
             atr_stop_multiple=2.0,
-            reward_ratio=50.0,  # sem alvo: a saída é a mínima de 10 dias
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
+        ),
+        TraderProfile(
+            key="davi",
+            name="Davi Dow",
+            persona="Veterano do pregão: compra o Dow Jones (DIA) quando rompe a máxima de 20 dias.",
+            symbol="DIA",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1d",
+            strategy=TurtleBreakout(20, 10),
+            data_lookback_days=90,
+            # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 2,21.
+            # No day trade (2 anos, 228 combinações) nada passou na prova.
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
+        ),
+        TraderProfile(
+            key="ivo",
+            name="Ivo Miúdo",
+            persona="Elétrico: faz day trade nas pequenas empresas americanas (Russell 2000, IWM).",
+            symbol="IWM",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1min",
+            strategy=OpeningRangeDayTrade(5),
+            data_lookback_days=5,
+            reward_ratio=2.0,  # melhor no treino da escola de 2 anos; reprovado na prova
+            day_trade=True,
         ),
     ]

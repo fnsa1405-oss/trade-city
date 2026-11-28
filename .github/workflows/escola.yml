@@ -2,20 +2,29 @@ name: Escola
 
 # Disparo manual pelo celular: aba Actions > Escola > Run workflow.
 # Cada trader testa várias estratégias e tempos gráficos com dados públicos.
+# Day trade (teo, lena, davi, ivo): usa os candles guardados pela Coleta e, se existir
+# o segredo MASSIVE_API_KEY (plano gratuito da Massive, antiga Polygon.io), ~2 anos de 1 min.
 on:
   # roda também em PRs que mexem na escola, para conferir o resultado antes do merge
   pull_request:
     paths:
       - "trade_city/school.py"
       - "trade_city/strategies/**"
+      - "trade_city/intraday.py"
+      - "trade_city/history.py"
       - ".github/workflows/escola.yml"
   workflow_dispatch:
     inputs:
       trader:
-        description: "Qual trader (todos, bia, edu, sol, rui, dora, teo, lena)"
+        description: "Qual trader"
         type: choice
-        options: [todos, bia, edu, sol, rui, dora, teo, lena]
+        options: [todos, bia, edu, sol, rui, dora, teo, lena, davi, ivo]
         default: todos
+      modo:
+        description: "normal, swing (índices em 60 min e diário) ou scalp (criptos em 1 e 5 min)"
+        type: choice
+        options: [normal, swing, scalp]
+        default: normal
       dias:
         description: "Dias de histórico (cripto)"
         type: number
@@ -27,17 +36,27 @@ permissions:
 jobs:
   escola:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      - name: Abrir os candles guardados pela coleta
+        run: |
+          if git fetch --depth=1 origin dados-intraday; then
+            git worktree add -B dados-intraday "$RUNNER_TEMP/dados-intraday" FETCH_HEAD
+            ln -s "$RUNNER_TEMP/dados-intraday/dados" dados
+          else
+            echo "ainda não há candles guardados"
+          fi
       - name: Rodar a escola
         env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
           TRADER: ${{ inputs.trader || 'todos' }}
           DIAS: ${{ inputs.dias || 1095 }}
+          MODO: ${{ inputs.modo || 'normal' }}
         run: |
-          python -m trade_city escola "$TRADER" --dias "$DIAS" --saida escola.md
+          python -m trade_city escola "$TRADER" --dias "$DIAS" --modo "$MODO" --saida escola.md
           cat escola.md >> "$GITHUB_STEP_SUMMARY"
