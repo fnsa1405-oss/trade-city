@@ -113,7 +113,11 @@ def test_all_day_candidates_run_in_school(step):
     bars = session_bars(days=20 if step == 5 else 6, step=step, seed=11)
     results = evaluate(day_trader(OpeningRangeDayTrade(5)), {f"{step}min": bars})
     # sem regra de saída própria, os alvos distantes (10x e saída da estratégia) não são testados
-    expected = sum(len(DAY_RISK_VARIANTS) if c.make().has_exit else sum(r.reward_ratio < 10 for r in DAY_RISK_VARIANTS) for c in DAY_CANDIDATES)
+    expected = sum(
+        len(DAY_RISK_VARIANTS) if c.make().has_exit else sum(r.reward_ratio < 10 for r in DAY_RISK_VARIANTS)
+        for c in DAY_CANDIDATES
+        if c.timeframes is None or f"{step}min" in c.timeframes
+    )
     assert len(results) == expected
 
 

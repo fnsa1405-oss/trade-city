@@ -33,6 +33,7 @@ from .strategies import (
     LarryWilliams93,
     MeanReversion,
     MondayAsiaOpen,
+    MovingAverageTrend,
     NoiseAreaMomentum,
     OpeningRangeDayTrade,
     PontoContinuo,
@@ -54,6 +55,7 @@ from .strategies import (
 class Candidate:
     label: str
     make: Callable[[], Strategy]
+    timeframes: tuple[str, ...] | None = None  # só nestes tempos gráficos (None = todos)
 
 
 @dataclass(frozen=True)
@@ -173,6 +175,16 @@ DAY_CANDIDATES += WYCKOFF_DAY
 SWING_SETUPS += WYCKOFF_SWING
 CANDIDATES += WYCKOFF_SWING  # criptos (1h, 4h, diário) e índices em swing
 
+# day trade a favor das médias (pedido de 28/11/2026): MMA 200/50/20 e MME9 empilhadas nos
+# tempos de contexto e candle gatilho no 2 min (montado do 1 min) partindo da MME9/MMA20
+MEDIAS_ALIGN = ((60, 15, 5), (60, 15), (15, 5))
+MEDIAS_DAY: list[Candidate] = [
+    Candidate(MovingAverageTrend(t, a).name, lambda t=t, a=a: MovingAverageTrend(t, a), ("1min",))
+    for a in MEDIAS_ALIGN
+    for t in ("pc", "pfr", "engolfo", "martelo", "forca")
+]
+DAY_CANDIDATES += MEDIAS_DAY
+
 RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 2 ATR, alvo 2x", 2.0, 2.0),
     RiskVariant("stop 3 ATR, alvo 2x", 3.0, 2.0),
@@ -289,6 +301,8 @@ def evaluate(
         train_bars = bars[:split]
         sub = fine if fine and tf != "1min" else None
         for cand in candidates:
+            if cand.timeframes is not None and tf not in cand.timeframes:
+                continue
             for rv in risks:
                 if rv.reward_ratio >= 10 and not cand.make().has_exit:
                     continue  # sem alvo e sem regra de saída, a operação só termina no stop
