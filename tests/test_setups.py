@@ -190,3 +190,50 @@ def test_scalp_setups_run_on_crypto_minutes_with_real_costs():
         for t in r.train.trades:
             gross = (t.exit_price - t.entry_price) * t.qty
             assert t.pnl < gross
+
+
+def _range_then(event):
+    """30 candles diários numa faixa de 99 a 101; depois o candle `event`."""
+    t = datetime(2025, 1, 6, 16, tzinfo=NY)
+    bars = []
+    for k in range(70):
+        lo, hi = (99.0, 100.6) if k % 2 else (99.4, 101.0)
+        bars.append(Bar((t + timedelta(days=k)).astimezone(timezone.utc), 100, hi, lo, 100.2 if k % 2 else 99.8, 1000))
+    bars.append(Bar((t + timedelta(days=70)).astimezone(timezone.utc), *event))
+    return bars
+
+
+def test_wyckoff_spring_upthrust_and_volume_filter():
+    from trade_city.strategies import WyckoffSpring
+
+    spring = _range_then((99.5, 99.9, 98.0, 99.7, 500))  # perde 99 e volta, volume baixo
+    s = WyckoffSpring(swing=True)
+    s.prepare(spring)
+    e = s.decide(spring)
+    assert e.side is Side.LONG and e.trigger == 99.9 and e.stop == 98.0
+    strong = WyckoffSpring(swing=True, low_volume=True)
+    loud = _range_then((99.5, 99.9, 98.0, 99.7, 5000))
+    strong.prepare(loud)
+    assert strong.decide(loud) is None  # volume alto: não é o spring "sem oferta"
+    up = _range_then((100.5, 102.5, 100.3, 100.8, 500))
+    s = WyckoffSpring(swing=True)
+    s.prepare(up)
+    assert s.decide(up).side is Side.SHORT
+
+
+def test_wyckoff_sos_then_lps_and_climax():
+    from trade_city.strategies import WyckoffClimax, WyckoffSOSLPS
+
+    bars = _range_then((100.5, 104.0, 100.4, 103.8, 3000))  # SOS: larga, volume, fecha no topo
+    t = bars[-1].ts
+    bars.append(Bar(t + timedelta(days=1), 103.5, 103.6, 102.0, 102.5, 400))  # recua até a metade, volume baixo
+    s = WyckoffSOSLPS(swing=True)
+    s.prepare(bars)
+    e = s.decide(bars)
+    assert e is not None and e.side is Side.LONG and e.stop == 102.0 and e.trigger == 103.6
+
+    sc = _range_then((99.5, 99.6, 96.0, 98.5, 5000))  # clímax de venda com absorção
+    c = WyckoffClimax(swing=True)
+    c.prepare(sc)
+    e = c.decide(sc)
+    assert e is not None and e.side is Side.LONG and e.stop == 96.0

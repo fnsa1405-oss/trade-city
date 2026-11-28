@@ -40,6 +40,9 @@ from .strategies import (
     TrendFollower,
     TurtleBreakout,
     WilliamsBreakout,
+    WyckoffClimax,
+    WyckoffSOSLPS,
+    WyckoffSpring,
 )
 
 
@@ -138,6 +141,27 @@ SCALP_RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop do gráfico, alvo 3x", 1.5, 3.0),
     RiskVariant("stop do gráfico, saída do setup", 1.5, 50.0),
 ]
+
+def _wyckoff(suffix: str, **kw) -> list[Candidate]:
+    """Os quatro gatilhos de Wyckoff da apostila (spring, spring com volume baixo, SOS+LPS e
+    clímax), com e sem a confluência do tempo gráfico de cima."""
+    out = []
+    for conf in (False, True):
+        tag = suffix + (" + tempo de cima" if conf else "")
+        out += [
+            Candidate(f"Wyckoff spring/upthrust{tag}", lambda c=conf: WyckoffSpring(confluence=c, **kw)),
+            Candidate(f"Wyckoff spring/upthrust volume baixo{tag}", lambda c=conf: WyckoffSpring(low_volume=True, confluence=c, **kw)),
+            Candidate(f"Wyckoff SOS + LPS{tag}", lambda c=conf: WyckoffSOSLPS(confluence=c, **kw)),
+            Candidate(f"Wyckoff clímax SC/BC{tag}", lambda c=conf: WyckoffClimax(confluence=c, **kw)),
+        ]
+    return out
+
+
+WYCKOFF_DAY = _wyckoff("")
+WYCKOFF_SWING = _wyckoff(" swing", swing=True)
+DAY_CANDIDATES += WYCKOFF_DAY
+SWING_SETUPS += WYCKOFF_SWING
+CANDIDATES += WYCKOFF_SWING  # criptos (1h, 4h, diário) e índices em swing
 
 RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 2 ATR, alvo 2x", 2.0, 2.0),

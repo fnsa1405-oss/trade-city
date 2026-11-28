@@ -112,7 +112,9 @@ def test_noise_area_needs_history_then_trades():
 def test_all_day_candidates_run_in_school(step):
     bars = session_bars(days=20 if step == 5 else 6, step=step, seed=11)
     results = evaluate(day_trader(OpeningRangeDayTrade(5)), {f"{step}min": bars})
-    assert len(results) == len(DAY_CANDIDATES) * len(DAY_RISK_VARIANTS)
+    # sem regra de saída própria, os alvos distantes (10x e saída da estratégia) não são testados
+    expected = sum(len(DAY_RISK_VARIANTS) if c.make().has_exit else sum(r.reward_ratio < 10 for r in DAY_RISK_VARIANTS) for c in DAY_CANDIDATES)
+    assert len(results) == expected
 
 
 def test_paper_broker_short_cash_and_stop():

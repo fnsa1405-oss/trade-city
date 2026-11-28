@@ -22,6 +22,7 @@ from .setups import (
     StructureFailure,
 )
 from .trend import TrendFollower
+from .wyckoff import WyckoffClimax, WyckoffSOSLPS, WyckoffSpring
 
 __all__ = [
     "Strategy",
@@ -52,4 +53,7 @@ __all__ = [
     "StructureFailure",
     "FibonacciPullback",
     "StormerIFR2",
+    "WyckoffSpring",
+    "WyckoffSOSLPS",
+    "WyckoffClimax",
 ]
