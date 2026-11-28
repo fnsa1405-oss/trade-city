@@ -75,3 +75,21 @@ def test_massive_retries_rate_limit():
 
     assert len(massive_bars("SPY", "5min", 5, "K", fetch=fetch, pause=0)) == 1
     assert len(calls) == 2
+
+
+def test_collect_b3_keeps_only_sao_paulo_session_and_merges(tmp_path):
+    from datetime import datetime, timezone
+
+    from trade_city.history import collect_b3, csv_path
+    from trade_city.data import load_csv
+    from trade_city.models import Bar
+
+    # 26/11/2026 (quinta): 12:55 UTC = 09:55 em SP (fora), 13:00 UTC = 10:00 (dentro), 21:00 UTC = 18:00 (fora)
+    times = [datetime(2026, 11, 26, 12, 55, tzinfo=timezone.utc), datetime(2026, 11, 26, 13, 0, tzinfo=timezone.utc), datetime(2026, 11, 26, 21, 0, tzinfo=timezone.utc)]
+    bars = [Bar(t, 1, 2, 0.5, 1.5, 10) for t in times]
+    collect_b3(str(tmp_path), log=lambda *_: None, fetch=lambda s, tf, d: bars)
+    kept = load_csv(csv_path(str(tmp_path), "IBOV", "5min"))
+    assert [b.ts for b in kept] == [times[1]]
+    later = [Bar(datetime(2026, 11, 27, 14, 0, tzinfo=timezone.utc), 1, 2, 0.5, 1.5, 10)]
+    collect_b3(str(tmp_path), log=lambda *_: None, fetch=lambda s, tf, d: later)
+    assert len(load_csv(csv_path(str(tmp_path), "BOVA11", "1min"))) == 2

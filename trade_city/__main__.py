@@ -211,7 +211,7 @@ def main(argv: list[str] | None = None) -> None:
     cer.add_argument("--dados", default="dados")
     cer.add_argument("--pasta", default="cerebros")
     cer.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
-    col = sub.add_parser("coletar", help="guarda os candles de 5 e 1 min dos traders de day trade")
+    col = sub.add_parser("coletar", help="guarda os candles de 5 e 1 min dos traders de day trade e do Ibovespa (B3)")
     col.add_argument("--dados", default="dados")
     run = sub.add_parser("rodar", help="roda a mesa (corretora simulada por padrão)")
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
@@ -328,9 +328,10 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.cmd == "coletar":
-        from .history import collect
+        from .history import collect, collect_b3
 
         collect(sorted({t.symbol for t in default_traders() if t.day_trade}), args.dados)
+        collect_b3(args.dados)
         return
 
     if args.cmd == "destravar":
