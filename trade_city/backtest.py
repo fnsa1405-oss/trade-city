@@ -1,6 +1,7 @@
 """Backtest: roda a mesma linha de produção sobre candles históricos."""
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -104,9 +105,13 @@ def run_backtest(
     slippage_pct: float | None = None,
     record_features: bool = False,
     brain=None,
+    fine: Sequence[Bar] | None = None,
 ) -> BacktestReport:
     """Entradas no preço de abertura do candle seguinte ao sinal. Se stop e alvo cabem no mesmo
-    candle, conta o stop (hipótese pessimista). Day trade nunca dorme posicionado."""
+    candle, conta o stop (hipótese pessimista). Day trade nunca dorme posicionado.
+
+    `fine`: candles de 1 minuto do mesmo período. Com eles, entrada por ordem stop, stop e alvo
+    são conferidos minuto a minuto dentro de cada candle, na ordem em que aconteceram."""
     risk = risk_for(trader, risk or RiskConfig())
     strategy = trader.strategy
     if fee_pct is None:
@@ -123,6 +128,8 @@ def run_backtest(
     position: _Position | None = None
     pending: TradePlan | None = None
     pending_features: tuple | None = None
+    pending_trigger: float | None = None  # ordem stop: entra só se o preço passar deste nível
+    pending_until = -1  # último candle em que a ordem stop vale
 
     def close(pos: _Position, price: float, ts: datetime, reason: str) -> None:
         nonlocal equity, peak
@@ -136,15 +143,51 @@ def run_backtest(
         peak = max(peak, equity)
         report.max_drawdown_pct = max(report.max_drawdown_pct, (peak - equity) / peak)
 
+    fine_ts = [b.ts for b in fine] if fine else []
+    step = (bars[1].ts - bars[0].ts) if len(bars) > 1 else None
+
+    def path(i: int) -> list[Bar]:
+        """Os candles de 1 minuto dentro do candle i, em ordem (ou o próprio candle, sem eles)."""
+        if not fine:
+            return [bars[i]]
+        end_ts = bars[i + 1].ts if i + 1 < len(bars) else bars[i].ts + step
+        if step is not None:
+            end_ts = min(end_ts, bars[i].ts + step)
+        lo, hi = bisect_left(fine_ts, bars[i].ts), bisect_left(fine_ts, end_ts)
+        return list(fine[lo:hi]) or [bars[i]]
+
     for i in range(len(bars)):
         bar = bars[i]
+        subs = path(i)
+        first = 0  # primeiro minuto em que a posição já existe
+        fill_k = None  # minuto da entrada por ordem stop: não dá para saber o que veio antes dentro dele
         if pending is not None:
             sign = pending.side.sign
-            entry = bar.open * (1 + sign * slippage_pct)
             low, high = sorted((pending.stop_loss, pending.take_profit))
-            if low < entry < high:
-                position = _Position(pending, entry, bar.ts, pending_features)
-            pending = None
+            if pending_trigger is None:  # ordem a mercado na abertura
+                entry = bar.open * (1 + sign * slippage_pct)
+                if low < entry < high:
+                    position = _Position(pending, entry, bar.ts, pending_features)
+                pending = None
+            else:
+                long_order = pending.side is Side.LONG
+                same_day = not strategy.day_trade or bar.ts.astimezone(NY).date() == pending.signal.ts.astimezone(NY).date()
+                k_hit = None
+                if same_day:
+                    for k, sb in enumerate(subs):
+                        if (sb.high >= pending_trigger) if long_order else (sb.low <= pending_trigger):
+                            k_hit = k
+                            break
+                if k_hit is not None:
+                    sb = subs[k_hit]
+                    base = max(sb.open, pending_trigger) if long_order else min(sb.open, pending_trigger)
+                    entry = base * (1 + sign * slippage_pct)
+                    if low < entry < high:
+                        position = _Position(pending, entry, sb.ts, pending_features)
+                        first = fill_k = k_hit
+                    pending = None
+                elif not same_day or i >= pending_until:
+                    pending = None  # ordem stop venceu sem ser acionada
 
         if position is not None:
             plan = position.plan
@@ -154,21 +197,30 @@ def run_backtest(
                 # faltou candle no fim do pregão: sai na abertura seguinte, nunca carrega a posição
                 close(position, bar.open * (1 - sign * slippage_pct), bar.ts, "fim do pregão")
                 position = None
-            elif (bar.low <= plan.stop_loss) if long else (bar.high >= plan.stop_loss):
-                worst = min(bar.open, plan.stop_loss) if long else max(bar.open, plan.stop_loss)
-                close(position, worst * (1 - sign * slippage_pct), bar.ts, "stop loss")
-                position = None
-            elif (bar.high >= plan.take_profit) if long else (bar.low <= plan.take_profit):
-                best = max(bar.open, plan.take_profit) if long else min(bar.open, plan.take_profit)
-                close(position, best, bar.ts, "stop gain")
-                position = None
-            elif strategy.exit_signal(bars[max(0, i + 1 - strategy.window) : i + 1], plan.side):
-                close(position, bar.close * (1 - sign * slippage_pct), bar.ts, "saída da estratégia")
-                position = None
+            else:
+                for k in range(first, len(subs)):
+                    sb = subs[k]
+                    if (sb.low <= plan.stop_loss) if long else (sb.high >= plan.stop_loss):
+                        worst = min(sb.open, plan.stop_loss) if long else max(sb.open, plan.stop_loss)
+                        if k == fill_k:
+                            worst = plan.stop_loss  # a abertura veio antes da entrada; sai no stop
+                        close(position, worst * (1 - sign * slippage_pct), sb.ts, "stop loss")
+                        position = None
+                        break
+                    if k == fill_k:
+                        continue  # no minuto da entrada por ordem stop, o alvo não conta (pessimista)
+                    if (sb.high >= plan.take_profit) if long else (sb.low <= plan.take_profit):
+                        best = max(sb.open, plan.take_profit) if long else min(sb.open, plan.take_profit)
+                        close(position, best, sb.ts, "stop gain")
+                        position = None
+                        break
+                if position is not None and strategy.exit_signal(bars[max(0, i + 1 - strategy.window) : i + 1], plan.side):
+                    close(position, bar.close * (1 - sign * slippage_pct), bar.ts, "saída da estratégia")
+                    position = None
             if position is not None or not strategy.day_trade:
                 continue  # swing: espera o próximo candle; day trade pode entrar de novo
 
-        if i + 1 >= len(bars) or i + 1 < strategy.min_bars:
+        if pending is not None or i + 1 >= len(bars) or i + 1 < strategy.min_bars:
             continue
         window = bars[max(0, i + 1 - strategy.window) : i + 1]
         decision = strategy.decide(window)
@@ -180,7 +232,8 @@ def run_backtest(
         today = day_start(bar.ts, risk.timezone)
         stats = compute_stats(trader.capital, [p for _, p in pnls], [p for ts, p in pnls if ts >= today])
         mood = compute_mood(stats.recent_outcomes, stats.day_pnl)
-        signal = Signal(trader.key, trader.symbol, bar.close, decision.reason, bar.ts, decision.side, decision.stop)
+        price = decision.trigger if decision.trigger is not None else bar.close
+        signal = Signal(trader.key, trader.symbol, price, decision.reason, bar.ts, decision.side, decision.stop)
         plan, _ = guardian.plan(signal, bars[max(0, i - risk.atr_period - 1) : i + 1], stats.capital, mood, trader.asset_class)
         if plan is None:
             report.rejected += 1
@@ -196,6 +249,8 @@ def run_backtest(
         audit = auditor.review(plan, ctx)
         if audit.approved:
             pending = plan
+            pending_trigger = decision.trigger
+            pending_until = i + decision.valid_bars
             if record_features:
                 from .brain import features
 

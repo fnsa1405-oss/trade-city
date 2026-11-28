@@ -20,14 +20,22 @@ from .strategies import (
     DowHeikinAshi,
     DowSwing,
     DowTheoryDayTrade,
+    FibonacciPullback,
     HeikinAshiTrend,
     HeikinAshiTrendPullback,
     HolyGrail,
+    LarryWilliams91,
+    LarryWilliams92,
+    LarryWilliams93,
     MeanReversion,
     MondayAsiaOpen,
     NoiseAreaMomentum,
     OpeningRangeDayTrade,
+    PontoContinuo,
+    Stormer123,
+    StormerIFR2,
     Strategy,
+    StructureFailure,
     Supertrend,
     TrendFollower,
     TurtleBreakout,
@@ -78,6 +86,20 @@ DAY_CANDIDATES: list[Candidate] = [
     Candidate("Heikin-Ashi + MME 9/21 (60/15/gatilho)", lambda: HeikinAshiTrendPullback()),
     Candidate("Teoria de Dow (60/15/gatilho)", lambda: DowTheoryDayTrade()),
     Candidate("Dow 60 min + gatilho Heikin-Ashi", lambda: DowHeikinAshi()),
+    # setups ensinados por traders conhecidos (fontes nos docstrings de strategies/setups.py)
+    Candidate("Larry Williams 9.1", lambda: LarryWilliams91()),
+    Candidate("Larry Williams 9.1 + 60 min", lambda: LarryWilliams91(confluence=True)),
+    Candidate("Larry Williams 9.2", lambda: LarryWilliams92()),
+    Candidate("Larry Williams 9.2 + 60 min", lambda: LarryWilliams92(confluence=True)),
+    Candidate("Larry Williams 9.3", lambda: LarryWilliams93()),
+    Candidate("Larry Williams 9.3 + 60 min", lambda: LarryWilliams93(confluence=True)),
+    Candidate("Stormer 123", lambda: Stormer123()),
+    Candidate("Stormer 123 + 60 min", lambda: Stormer123(confluence=True)),
+    Candidate("Ponto Contínuo MME21", lambda: PontoContinuo()),
+    Candidate("Ponto Contínuo MME21 + 60 min", lambda: PontoContinuo(confluence=True)),
+    Candidate("Falha de estrutura 2B + 15 min", lambda: StructureFailure()),
+    Candidate("Fibonacci 38-62% + 60/15 min", lambda: FibonacciPullback()),
+    Candidate("IFR2 Stormer + 60 min", lambda: StormerIFR2()),
 ]
 
 RISK_VARIANTS: list[RiskVariant] = [
@@ -156,6 +178,16 @@ def timeframes_for(trader: TraderProfile, base_bars: Sequence[Bar], base_tf: str
     return {base_tf: bars}
 
 
+def with_15min(series: dict[str, list[Bar]]) -> dict[str, list[Bar]]:
+    """Acrescenta o gatilho de 15 minutos, montado a partir dos candles de 5 minutos."""
+    from .intraday import Timeline, higher_timeframe
+
+    out = dict(series)
+    if len(series.get("5min", [])) >= 300:
+        out["15min"] = higher_timeframe(Timeline.build(series["5min"]), 15).bars
+    return out
+
+
 def evaluate(
     trader: TraderProfile,
     series: dict[str, list[Bar]],
@@ -163,7 +195,10 @@ def evaluate(
     candidates: Sequence[Candidate] | None = None,
     risks: Sequence[RiskVariant] | None = None,
     base_risk: RiskConfig = RiskConfig(),
+    fine: Sequence[Bar] | None = None,
 ) -> list[Result]:
+    """`fine`: candles de 1 minuto, usados por dentro dos tempos gráficos maiores para saber
+    em que ordem entrada, stop e alvo aconteceram."""
     if candidates is None:
         candidates = DAY_CANDIDATES if trader.day_trade else CANDIDATES
     if risks is None:
@@ -174,15 +209,16 @@ def evaluate(
             continue
         split = int(len(bars) * rules.train_share)
         train_bars = bars[:split]
+        sub = fine if fine and tf != "1min" else None
         for cand in candidates:
             for rv in risks:
                 if rv.reward_ratio >= 10 and not cand.make().has_exit:
                     continue  # sem alvo e sem regra de saída, a operação só termina no stop
                 risk = replace(base_risk, atr_stop_multiple=rv.atr_stop_multiple, reward_ratio=rv.reward_ratio)
                 student = replace(trader, strategy=cand.make(), timeframe=tf, atr_stop_multiple=None, reward_ratio=None)
-                train = run_backtest(student, train_bars, risk)
+                train = run_backtest(student, train_bars, risk, fine=sub)
                 warmup = max(student.strategy.window, risk.atr_period + 2)
-                test_full = run_backtest(replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk)
+                test_full = run_backtest(replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk, fine=sub)
                 test = _only_after(test_full, bars[split].ts)
                 results.append(Result(trader, tf, cand.label, rv.label, train, test))
     return results
