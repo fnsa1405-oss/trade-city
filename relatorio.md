@@ -6,12 +6,15 @@ O que ele olha: retorno 1 candle / ATR, retorno 5 candles / ATR, retorno 20 cand
 
 | Trader | Situação | Prova sem cérebro | Prova com cérebro | Limite |
 | --- | --- | --- | --- | --- |
-| Bia Satoshi | poucas operações (90; mínimo 150) | - | - | - |
-| Edu Éter | poucas operações (82; mínimo 150) | - | - | - |
-| Sol Ventura | poucas operações (99; mínimo 150) | - | - | - |
+| Bia Satoshi | poucas operações (43; mínimo 150) | - | - | - |
+| Edu Éter | poucas operações (80; mínimo 150) | - | - | - |
+| Sol Ventura | poucas operações (26; mínimo 150) | - | - | - |
 | Rui Xis | poucas operações (60; mínimo 150) | - | - | - |
-| Dora Doge | em treinamento (não melhorou a prova) | 84 op., FL 0.66, -881 | 40 op., FL 0.62, -439 | 50% |
-| Teo Chip | em treinamento (não melhorou a prova) | 150 op., FL 0.76, -726 | 66 op., FL 0.91, -124 | 50% |
-| Dona Lena | em treinamento (não melhorou a prova) | 150 op., FL 0.82, -332 | 23 op., FL 1.55, +127 | 50% |
-| Davi Dow | em treinamento (não melhorou a prova) | 137 op., FL 0.64, -774 | 41 op., FL 0.61, -262 | 45% |
+| Dora Doge | poucas operações (77; mínimo 150) | - | - | - |
+| Teo Chip | poucas operações (12; mínimo 150) | - | - | - |
+| Dona Lena | poucas operações (9; mínimo 150) | - | - | - |
+| Davi Dow | poucas operações (5; mínimo 150) | - | - | - |
+| Mia Média | poucas operações (90; mínimo 150) | - | - | - |
+| Flora Fluxo | em treinamento (não melhorou a prova) | 61 op., FL 1.24, +171 | 24 op., FL 1.22, +68 | 45% |
+| Levy Pivô | em treinamento (não melhorou a prova) | 112 op., FL 0.69, -539 | 60 op., FL 1.03, +24 | 50% |
 | Ivo Miúdo | em treinamento (não melhorou a prova) | 150 op., FL 0.79, -522 | 13 op., FL 0.68, -61 | 50% |
