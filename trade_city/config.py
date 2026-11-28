@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TrendFollower
+from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TrendFollower, TurtleBreakout
 
 
 @dataclass(frozen=True)
@@ -107,40 +107,47 @@ def default_traders() -> list[TraderProfile]:
         TraderProfile(
             key="teo",
             name="Teo Chip",
-            persona="Disciplinado e rápido: faz day trade no Nasdaq 100 no rompimento da abertura.",
+            persona="Disciplinado e paciente: compra o Nasdaq 100 quando rompe a máxima de 20 dias.",
             symbol="QQQ",
             asset_class=AssetClass.EQUITY,
-            timeframe="1min",
-            strategy=OpeningRangeDayTrade(15),
-            data_lookback_days=5,
-            # escola com 2 anos (27/11/2026): nenhuma estratégia de day trade passou. A melhor no
-            # treino (ORB 15 min, gatilho 1 min, alvo 2x) vai para o cérebro tentar filtrar.
-            reward_ratio=2.0,
-            day_trade=True,
+            timeframe="1d",
+            strategy=TurtleBreakout(20, 10),
+            data_lookback_days=90,
+            # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 1,42.
+            # No day trade (2 anos, 228 combinações) nada passou na prova.
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),
         TraderProfile(
             key="lena",
             name="Dona Lena",
-            persona="Paciente e experiente: faz day trade no S&P 500 no rompimento da abertura.",
+            persona="Paciente e experiente: compra o S&P 500 quando rompe a máxima de 20 dias.",
             symbol="SPY",
             asset_class=AssetClass.EQUITY,
-            timeframe="5min",
-            strategy=OpeningRangeDayTrade(15),
-            data_lookback_days=5,
-            reward_ratio=3.0,  # melhor no treino da escola de 2 anos; reprovada na prova
-            day_trade=True,
+            timeframe="1d",
+            strategy=TurtleBreakout(20, 10),
+            data_lookback_days=90,
+            # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 1,59.
+            # No day trade (2 anos, 228 combinações) nada passou na prova.
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),
         TraderProfile(
             key="davi",
             name="Davi Dow",
-            persona="Veterano do pregão: faz day trade no Dow Jones (DIA) no rompimento da abertura.",
+            persona="Veterano do pregão: compra o Dow Jones (DIA) quando rompe a máxima de 20 dias.",
             symbol="DIA",
             asset_class=AssetClass.EQUITY,
-            timeframe="5min",
-            strategy=OpeningRangeDayTrade(15),
-            data_lookback_days=5,
-            reward_ratio=3.0,  # melhor no treino da escola de 2 anos; reprovado na prova
-            day_trade=True,
+            timeframe="1d",
+            strategy=TurtleBreakout(20, 10),
+            data_lookback_days=90,
+            # escola em swing (28/11/2026, 10 anos de diário): Turtle sistema 1, prova com fator de lucro 2,21.
+            # No day trade (2 anos, 228 combinações) nada passou na prova.
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
         ),
         TraderProfile(
             key="ivo",
