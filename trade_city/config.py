@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
 from .strategies import DonchianEnsemble, MovingAverageTrend, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
-from .strategies.orderflow import DeltaBreakout
+from .strategies.orderflow import DeltaBreakout, ORBDelta
 
 
 @dataclass(frozen=True)
@@ -220,6 +220,24 @@ def default_traders() -> list[TraderProfile]:
             approved=True,
             atr_stop_multiple=2.0,
             reward_ratio=10.0,
+            day_trade=True,
+            micro=True,
+        ),
+        TraderProfile(
+            key="flora",
+            name="Flora Fluxo",
+            persona="Day trade no S&P com o microcontrato MES: segue a abertura só quando a agressão concorda.",
+            symbol="SPY",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1min",
+            strategy=ORBDelta(15, 0.2),
+            data_lookback_days=5,
+            # escola de fluxo com microcontratos (28/11/2026, 2 anos de 1 min, 72 combinações no SPY):
+            # ORB 15 min com delta estimado a favor, alvo 3x. Treino 101 operações, fator de lucro
+            # 1,63; prova 54 operações, fator 1,23 (queda de 9%, perto da trava de 10%).
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=3.0,
             day_trade=True,
             micro=True,
         ),
