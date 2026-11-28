@@ -534,6 +534,11 @@ const tradeCity = {
       traders: traders().map((t) => ({ ...t, aoVivo: posicaoAoVivo(t), preco: estado.precos[t.ativo]?.preco ?? null })),
       eventos: Object.values(estado.mesas).flatMap((m) => m.eventos || []),
       operacoes: Object.values(estado.mesas).flatMap((m) => m.operacoes || []),
+      elenco: (() => {
+        const mapa = new Map();
+        for (const m of Object.values(estado.mesas)) for (const e of m.elenco || []) if (!mapa.has(e.key) || e.situacao === "na mesa") mapa.set(e.key, e);
+        return [...mapa.values()];
+      })(),
     };
   },
   assinar(fn) {

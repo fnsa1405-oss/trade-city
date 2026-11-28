@@ -36,7 +36,14 @@ export async function obterAoVivo() {
     traders: mesas.flatMap((m) => (m.traders || []).map((t) => ({ ...t, mesa: m.mesa, aoVivo: null, preco: null }))),
     eventos: mesas.flatMap((m) => m.eventos || []),
     operacoes: mesas.flatMap((m) => m.operacoes || []),
+    elenco: elencoDe(mesas),
   };
+}
+
+function elencoDe(mesas) {
+  const mapa = new Map();
+  for (const m of mesas) for (const e of m.elenco || []) if (!mapa.has(e.key) || e.situacao === "na mesa") mapa.set(e.key, e);
+  return [...mapa.values()];
 }
 
 export function assinar(fn) {
