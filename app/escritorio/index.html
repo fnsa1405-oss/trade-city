@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Trade City 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@800&family=Inter:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: cena 3D em tela cheia, barra de status no topo, cartão e abas embaixo. Visual único noturno. */
+:root{--bg:#0b0f2a;--panel:rgba(14,18,48,.9);--line:rgba(255,200,90,.7);--ink:#eef0ff;--muted:#a9b0e0;--amber:#ffc85a;--green:#3ddc97;--red:#ff4d6d;
+  --display:"Bricolage Grotesque","Trebuchet MS",sans-serif;--body:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;color-scheme:dark}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);-webkit-tap-highlight-color:transparent}
+#scene{position:fixed;inset:0}
+#scene canvas{width:100%;height:100%;display:block;touch-action:none}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.tag3d{position:absolute;left:0;top:0;background:rgba(10,14,40,.78);border-radius:12px;padding:4px 9px;font-size:12px;white-space:nowrap;display:flex;flex-direction:column;align-items:center;line-height:1.2;transition:opacity .3s;backdrop-filter:blur(4px)}
+.tag3d span{font-size:10px;color:var(--muted)}
+.bubble{position:absolute;left:0;top:0;background:#fff;color:#1b1f3b;font-weight:700;font-size:14px;padding:8px 13px;border-radius:18px;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.35);animation:pop .3s cubic-bezier(.2,1.6,.4,1)}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:#fff}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.hud{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:10px;background:var(--panel);border-radius:20px;padding:9px 10px 9px 14px;backdrop-filter:blur(8px);max-width:620px;margin:0 auto}
+.live{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:bl 1.2s infinite;flex:none}
+@keyframes bl{50%{opacity:.35}}
+.hud b{display:block;font-size:14px;color:var(--green);letter-spacing:.04em}
+.hud small{color:var(--muted);font-size:11.5px}
+.cap{margin-left:auto;font-family:var(--mono);font-size:13px;text-align:right}
+.cap small{display:block;font-family:var(--body);font-size:10px}
+.panic{border:0;background:var(--red);color:#fff;font-weight:800;font-size:12px;padding:10px 11px;border-radius:12px;cursor:pointer;flex:none}
+#card{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(78px + env(safe-area-inset-bottom,0px));max-width:560px;margin:0 auto;background:var(--panel);border:2px solid var(--line);border-radius:24px;padding:14px 16px;transform:translateY(130%);opacity:0;transition:transform .45s cubic-bezier(.2,1.3,.4,1),opacity .3s;backdrop-filter:blur(10px);pointer-events:none}
+#card.on{transform:none;opacity:1;pointer-events:auto}
+#card h4{margin:0 0 8px;font-size:12px;letter-spacing:.1em;color:var(--amber)}
+#card h3{margin:0;font-family:var(--display);font-size:24px}
+#card i{color:var(--amber);font-family:var(--display);font-weight:600}
+#card p{margin:10px 0 0;color:#cfd4ff;font-size:13.5px;line-height:1.5}
+.ch{display:flex;align-items:center;gap:12px}
+.av{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-family:var(--display);font-weight:800;color:#10142e;flex:none}
+.ok,.st{margin-left:auto;font-size:11px;font-weight:800;padding:5px 9px;border-radius:99px;background:rgba(61,220,151,.18);color:var(--green)}
+.st{background:rgba(255,200,90,.16);color:var(--amber)}
+.mood{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px}
+.mood span{font-size:11px;text-align:center;padding:6px 0;border-radius:99px;background:rgba(255,255,255,.07);color:var(--muted)}
+.mood span.on{background:#6fd3ff;color:#10142e;font-weight:800}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.kv div{background:rgba(255,255,255,.06);border-radius:12px;padding:7px 9px}
+.kv small{display:block;font-size:10px;color:var(--muted)}.kv b{font-family:var(--mono);font-size:12.5px}
+.row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:13.5px}
+.row .m{color:var(--muted);font-family:var(--mono);font-size:12px}.row .g{color:var(--green)}
+.row .pill{background:#6fd3ff;color:#10142e;font-weight:800;font-size:11px;padding:2px 8px;border-radius:99px;margin-left:auto}
+.dot{width:10px;height:10px;border-radius:50%}
+.bar{flex:1;height:7px;background:rgba(255,255,255,.08);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--green)}
+.foot{font-size:12px!important;color:var(--muted)!important}
+.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+.steps li{counter-increment:s;display:flex;align-items:center;gap:10px;padding:5px 0;color:#7d84b8;font-size:14px;transition:color .3s}
+.steps li::before{content:counter(s);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1);font-size:12px;font-weight:800;transition:.3s}
+.steps li.done{color:#fff;font-weight:700}.steps li.done::before{content:"✓";background:var(--green);color:#10142e}
+.tabs{position:fixed;left:0;right:0;bottom:0;padding:8px max(12px,env(safe-area-inset-left,0px)) calc(10px + env(safe-area-inset-bottom,0px));display:flex;justify-content:safe center;gap:6px;overflow-x:auto;scrollbar-width:none;background:linear-gradient(transparent,rgba(8,10,30,.85) 40%)}
+.tabs button{flex:none;border:0;background:rgba(255,255,255,.08);color:var(--muted);font:700 13px var(--body);padding:11px 14px;border-radius:14px;cursor:pointer;backdrop-filter:blur(6px)}
+.tabs button.on{background:var(--amber);color:#10142e}
+.tabs button:focus-visible,.panic:focus-visible{outline:3px solid #6fd3ff;outline-offset:2px}
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);font-family:var(--display);font-size:30px;transition:opacity .6s}
+body.ready #loading{opacity:0;pointer-events:none}
+#loading span{color:var(--amber)}
+.credit{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:calc(76px + env(safe-area-inset-top,0px));font-size:10px;color:rgba(255,255,255,.4)}
+.rec .tabs,.rec .credit{display:none}
+.voltar{color:var(--ink);text-decoration:none;font:800 24px/1 var(--body);padding:0 6px 2px 0;flex:none}
+.embed .hud,.embed .tabs,.embed .credit,.embed #card{display:none}
+.embed #loading{font-size:22px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<div id="scene"></div>
+<div id="labels"></div>
+<div class="hud"><a class="voltar" href="../" aria-label="Voltar ao app">‹</a><span class="live"></span><div><b>OPERANDO</b><small id="hud-sub">carregando…</small></div><div class="cap"><small>hoje</small><span id="hud-cap">—</span></div><button class="panic" onclick="window.panico&&window.panico()">■ PARAR TUDO</button></div>
+<div id="card"></div>
+<div class="tabs"><button data-t="geral" class="on" onclick="tab('geral')">Cidade</button><button data-t="mesa" onclick="tab('mesa')">Mesa</button><button data-t="ordem" onclick="tab('ordem')">Ordem</button><button data-t="escola" onclick="tab('escola')">Escola</button><button data-t="copa" onclick="tab('copa')">Copa</button><button data-t="lounge" onclick="tab('lounge')">Lounge</button><button data-t="reuniao" onclick="tab('reuniao')">Reunião</button></div>
+<div class="credit">Pessoas 3D: Quaternius (CC0) · Móveis: Kenney (CC0) · Three.js</div>
+<div id="loading"><div style="text-align:center">Trade<span>City</span><div style="width:180px;height:6px;margin:14px auto 0;border-radius:9px;background:rgba(255,255,255,.1);overflow:hidden"><i id="lbar" style="display:block;height:100%;width:4%;background:var(--amber);transition:width .3s"></i></div></div></div>
+<script type="importmap">{"imports":{"three":"./lib/three.module.min.js","three/addons/":"./lib/addons/"}}</script>
+<script type="module" src="./app.js"></script>
+
+</body></html>

@@ -1,4 +1,18 @@
-# Lugar do escritório 3D
+# Escritório 3D
+
+O escritório 3D (pessoas Quaternius CC0, móveis Kenney CC0, Three.js) mora nesta pasta:
+`index.html` + `app.js` + `assets/` + `lib/`. Ele abre de dois jeitos:
+
+- **dentro do app**: `escritorio.js` coloca `index.html` num iframe no topo do app. O 3D usa
+  o `window.TradeCity` da página principal (preços ao vivo inclusos) e esconde a própria barra.
+- **tela cheia**: `escritorio/index.html` sozinho, com abas, barra e botão de pânico. Aí ele
+  busca o `estado.json` dos branches da mesa direto (`aovivo.js`).
+
+`estado.json` daqui define só a montagem da sala (quem senta onde, cores, equipe). Os números,
+humor, posição, falas e a caminhada da ordem vêm da mesa de verdade (`aplicarAoVivo` em `app.js`):
+a caminhada do Nico só acontece quando a mesa abre uma operação de verdade.
+
+## Contrato antigo (para trocar o 3D por outro)
 
 O app (`app/index.html`) tenta carregar `app/escritorio/escritorio.js` ao abrir.
 Se o arquivo não existir, fica a cidade à noite feita em CSS. Para ligar o 3D,
