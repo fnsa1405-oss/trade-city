@@ -4,7 +4,8 @@ name: Mesa simulada
 # (hoje o Rui) analisam, passam pelo gestor de risco e pelo auditor e operam
 # na corretora simulada, com preços reais e dinheiro de mentira.
 # O livro de registros (trade_city.db) e o placar ficam salvos no branch "mesa-dados".
-# Para ver o placar pelo celular: aba Actions > Mesa simulada > última rodada.
+# Para ver pelo celular: o app (pasta app/, publicado no GitHub Pages) lê o estado.json deste branch.
+# O botão de pânico do app grava o branch "controle"; a mesa confere antes de cada rodada.
 on:
   schedule:
     - cron: "7,37 * * * *"
@@ -51,8 +52,9 @@ jobs:
 
       - name: Rodar a mesa
         run: |
-          python -m trade_city --db trade_city.db --grupo swing rodar | tee rodada.txt
+          python -m trade_city --db trade_city.db --grupo swing rodar --trava-git controle:trava.txt | tee rodada.txt
           python -m trade_city --db trade_city.db --grupo swing placar > placar.txt
+          python -m trade_city --db trade_city.db --grupo swing painel --mesa swing --saida estado.json
           {
             echo "## Rodada da mesa"
             echo '```'
@@ -67,11 +69,11 @@ jobs:
       - name: Salvar o livro no branch mesa-dados
         run: |
           WT="$RUNNER_TEMP/mesa-dados"
-          cp trade_city.db placar.txt "$WT/"
+          cp trade_city.db placar.txt estado.json "$WT/"
           cd "$WT"
           git config user.name "trade-city-mesa"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f trade_city.db placar.txt
+          git add -f trade_city.db placar.txt estado.json
           if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
           git commit -q -m "mesa: rodada $(date -u +%Y-%m-%dT%H:%MZ)"
           for i in 1 2 3 4; do

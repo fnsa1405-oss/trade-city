@@ -1,0 +1,92 @@
+name: Botão de pânico
+
+# Disparado pelo app (botão vermelho) ou à mão: Actions > Botão de pânico > Run workflow.
+# "travar" zera todas as posições e trava a mesa. "liberar" destrava.
+# A ordem fica gravada no branch "controle" (arquivo trava.txt). A mesa swing é travada
+# na hora por este workflow; a mesa de day trade confere o arquivo a cada minuto do pregão.
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: "travar ou liberar"
+        type: choice
+        options: [travar, liberar]
+        default: travar
+
+permissions:
+  contents: write
+
+jobs:
+  controle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gravar a ordem no branch controle
+        env:
+          ACAO: ${{ inputs.acao }}
+        run: |
+          WT="$RUNNER_TEMP/controle"
+          if git fetch --depth=1 origin controle; then
+            git worktree add -B controle "$WT" FETCH_HEAD
+          else
+            git worktree add --orphan -b controle "$WT"
+          fi
+          cd "$WT"
+          printf '%s\n%s\n%s\n' "$ACAO" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_ACTOR" > trava.txt
+          git config user.name "trade-city-mesa"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f trava.txt
+          git commit -q -m "controle: $ACAO"
+          for i in 1 2 3 4; do
+            git push origin controle && exit 0
+            sleep $((i * 5))
+          done
+          exit 1
+
+  swing:
+    needs: controle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # mesmo grupo da Mesa simulada: espera a rodada em andamento terminar e não briga pelo livro
+    concurrency:
+      group: mesa
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Aplicar na mesa swing
+        env:
+          ACAO: ${{ inputs.acao }}
+        run: |
+          WT="$RUNNER_TEMP/mesa-dados"
+          if git fetch --depth=1 origin mesa-dados; then
+            git worktree add -B mesa-dados "$WT" FETCH_HEAD
+            [ -f "$WT/trade_city.db" ] && cp "$WT/trade_city.db" trade_city.db
+          else
+            git worktree add --orphan -b mesa-dados "$WT"
+          fi
+          if [ "$ACAO" = "travar" ]; then
+            python -m trade_city --db trade_city.db --grupo swing panico | tee rodada.txt
+          else
+            python -m trade_city --db trade_city.db --grupo swing destravar | tee rodada.txt
+          fi
+          python -m trade_city --db trade_city.db --grupo swing placar > placar.txt
+          python -m trade_city --db trade_city.db --grupo swing painel --mesa swing --saida estado.json
+          { echo "## Botão de pânico: $ACAO"; echo '```'; cat rodada.txt; echo; cat placar.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cp trade_city.db placar.txt estado.json "$WT/"
+          cd "$WT"
+          git config user.name "trade-city-mesa"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f trade_city.db placar.txt estado.json
+          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+          git commit -q -m "pânico: $ACAO $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3 4; do
+            git push origin mesa-dados && exit 0
+            sleep $((i * 5))
+          done
+          exit 1

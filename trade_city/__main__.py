@@ -9,6 +9,7 @@
   python -m trade_city placar
   python -m trade_city panico
   python -m trade_city destravar
+  python -m trade_city painel --mesa swing --saida estado.json   (estado para o app)
 """
 from __future__ import annotations
 
@@ -34,6 +35,30 @@ def _load_env_file(path: str = ".env") -> None:
                     os.environ.setdefault(key.strip(), value.strip())
     except FileNotFoundError:
         pass
+
+
+def _remote_lock(spec: str | None) -> bool | None:
+    """Lê o botão de pânico do app: arquivo no branch "controle" (spec = "ramo:arquivo").
+
+    True = travar, False = liberada, None = não deu para ler (segue como está)."""
+    if not spec:
+        return None
+    import subprocess
+
+    ref, _, path = spec.partition(":")
+    try:
+        subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", ref], check=True, timeout=60, capture_output=True)
+        text = subprocess.run(
+            ["git", "show", f"FETCH_HEAD:{path}"], check=True, timeout=30, capture_output=True, text=True
+        ).stdout
+    except Exception:
+        return None
+    first = (text.strip().split() or [""])[0].lower()
+    if first == "travar":
+        return True
+    if first == "liberar":
+        return False
+    return None
 
 
 def _trader(key: str):
@@ -190,6 +215,10 @@ def main(argv: list[str] | None = None) -> None:
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
     run.add_argument("--desde", help="HH:MM de Nova York: espera até esse horário para começar")
     run.add_argument("--ate", help="HH:MM de Nova York: para o loop nesse horário")
+    run.add_argument("--trava-git", help='botão de pânico remoto, ex.: "controle:trava.txt" (conferido a cada ciclo)')
+    pain = sub.add_parser("painel", help="grava o estado da mesa em JSON para o app")
+    pain.add_argument("--mesa", default="swing", help="nome da mesa no app (swing ou day)")
+    pain.add_argument("--saida", default="estado.json")
     sub.add_parser("placar", help="mostra o placar do dia")
     sub.add_parser("panico", help="trava a mesa e zera todas as posições")
     sub.add_parser("destravar", help="libera a mesa depois do pânico")
@@ -282,6 +311,11 @@ def main(argv: list[str] | None = None) -> None:
         print(render(desk))
     elif args.cmd == "panico":
         print("\n".join(desk.panic()))
+    elif args.cmd == "painel":
+        from .painel import write_state
+
+        state = write_state(desk, args.mesa, args.saida)
+        print(f"estado da mesa {args.mesa} gravado em {args.saida} ({len(state['traders'])} traders na mesa)")
     elif args.cmd == "rodar":
         from datetime import datetime
 
@@ -296,6 +330,14 @@ def main(argv: list[str] | None = None) -> None:
             return int(h) * 60 + int(m)
 
         print(f"mesa rodando em modo {'simulado (dinheiro de mentira)' if desk.broker.paper else 'REAL'}")
+        lock = _remote_lock(args.trava_git)
+        if lock is True and not desk.ledger.kill_switch:
+            print("botão de pânico do app está acionado")
+            for event in desk.panic():
+                print(event, flush=True)
+        elif lock is False and desk.ledger.kill_switch:
+            desk.ledger.kill_switch = False
+            print("mesa liberada pelo app")
         if args.ate and ny_minutes() >= hm(args.ate):
             print("fora do horário desta rodada")
             return
@@ -308,6 +350,10 @@ def main(argv: list[str] | None = None) -> None:
             if not args.loop or (args.ate and ny_minutes() >= hm(args.ate)):
                 break
             time.sleep(args.loop)
+            if _remote_lock(args.trava_git) is True and not desk.ledger.kill_switch:
+                print("botão de pânico do app acionado durante o pregão", flush=True)
+                for event in desk.panic():
+                    print(event, flush=True)
 
 
 if __name__ == "__main__":
