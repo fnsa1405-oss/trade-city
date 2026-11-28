@@ -19,8 +19,8 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Dona Lena (`lena`) | SPY (S&P 500) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovada em 28/11/2026 (prova: fator de lucro 1,59) |
 | Bia Satoshi (`bia`) | BTC/USD | - | - | na escola |
 | Edu Éter (`edu`) | ETH/USD | - | - | na escola |
-| Sol Ventura (`sol`) | SOL/USD | - | - | na escola |
-| Dora Doge (`dora`) | DOGE/USD | - | - | na escola |
+| Sol Ventura (`sol`) | SOL/USD | diário | Momento de série temporal 28 | aprovada em 28/11/2026 (prova: fator de lucro 1,62) |
+| Dora Doge (`dora`) | DOGE/USD | 4h | Donchian em conjunto | aprovada em 28/11/2026 (prova: fator de lucro 1,17) |
 | Davi Dow (`davi`) | DIA (Dow Jones) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 2,21) |
 | Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade, gatilho 1 min | ORB 5 min, alvo 2x | na escola (o cérebro tenta filtrar) |
 
