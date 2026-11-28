@@ -3,7 +3,8 @@ name: Botão de pânico
 # Disparado pelo app (botão vermelho) ou à mão: Actions > Botão de pânico > Run workflow.
 # "travar" zera todas as posições e trava a mesa. "liberar" destrava.
 # A ordem fica gravada no branch "controle" (arquivo trava.txt). A mesa swing é travada
-# na hora por este workflow; a mesa de day trade confere o arquivo a cada minuto do pregão.
+# em até 1 minuto: se a mesa estiver no turno, ela mesma confere o arquivo a cada minuto;
+# se não estiver, este workflow aplica no livro na hora. O day trade também confere a cada minuto.
 on:
   workflow_dispatch:
     inputs:
@@ -15,11 +16,14 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   controle:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      mesa_rodando: ${{ steps.mesa.outputs.rodando }}
     steps:
       - uses: actions/checkout@v4
       - name: Gravar a ordem no branch controle
@@ -43,9 +47,22 @@ jobs:
             sleep $((i * 5))
           done
           exit 1
+      - name: A mesa está rodando agora?
+        id: mesa
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          N=$(gh run list -R "$GITHUB_REPOSITORY" -w mesa.yml -s in_progress --json databaseId -q length || echo 0)
+          if [ "${N:-0}" -gt 0 ]; then
+            echo "rodando=sim" >> "$GITHUB_OUTPUT"
+            echo "A mesa está no turno: ela confere o botão a cada minuto e aplica sozinha." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "rodando=nao" >> "$GITHUB_OUTPUT"
+          fi
 
   swing:
     needs: controle
+    if: needs.controle.outputs.mesa_rodando != 'sim'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # mesmo grupo da Mesa simulada: espera a rodada em andamento terminar e não briga pelo livro
