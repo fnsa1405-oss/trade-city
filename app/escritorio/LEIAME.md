@@ -52,3 +52,10 @@ A foto da mesa:
 
 Regras do visual (pedido do Alexandre): pessoas humanas realistas, nada de robô
 ou pixel, escritório completo à noite, e sem desfoque nas bordas.
+
+## Torre e cidade (`cidade.js`)
+
+O escritório fica no último andar de uma torre de vidro (letreiro TRADE CITY), 64 m acima da rua.
+`cidade.js` monta a cidade em volta: centro com prédios, bairro de casas com jardins, parques,
+postes e ruas com gente andando, carros e motos (tudo mesclado ou instanciado, leve no celular).
+As vistas `torre` (Prédio) e `rua` (Rua) entram nas abas e no passeio automático.
