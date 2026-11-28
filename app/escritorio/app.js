@@ -730,7 +730,10 @@ var NEWS = [], HIST = {};
 const FRASES = ['Proteja o capital primeiro. O lucro vem depois.', 'Siga o plano. Disciplina vence emoção.', 'Um stop pequeno é um bom negócio.', 'Paciência também é posição.',
   'Consistência vale mais que um grande acerto.', 'Não persiga o preço: espere o seu setup.', 'Perder faz parte. Quebrar não.', 'O mercado paga quem sabe esperar.'];
 const hhmm = d => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-function noticia(txt, quando = new Date()) { NEWS.unshift({ h: hhmm(quando), txt }); NEWS.length = Math.min(NEWS.length, 12); }
+function noticia(txt, quando = new Date(), fonte = '') { if (NEWS.some(n => n.txt === txt)) return; NEWS.push({ ts: +quando, h: hhmm(quando), txt, fonte }); NEWS.sort((a, b) => b.ts - a.ts); NEWS.length = Math.min(NEWS.length, 24); }
+// manchetes reais do mercado (workflow "Notícias do telão" grava no branch noticias, de hora em hora)
+async function buscarNoticias() { try { const r = await fetch(`https://raw.githubusercontent.com/fnsa1405-oss/trade-city/noticias/noticias.json?t=${Date.now()}`, { cache: 'no-store' }); if (!r.ok) return;
+  const d = await r.json(); const hoje = Date.now() - 36 * 3600e3; (d.itens || []).slice(0, 14).forEach(it => { const q = new Date(it.quando); if (+q > hoje) noticia(it.titulo, q, it.fonte); }); } catch (e) {} }
 function noticiasIniciais() { const tr = STATE.traders.filter(t => t.situacao !== 'na escola');
   noticia(`Mesa abre com ${tr.length} traders: ${tr.map(t => t.nome.split(' ')[0]).join(', ')}`);
   noticia(`Meta do dia: ${STATE.regras.meta_vitorias} vitórias · trava em ${STATE.regras.trava_derrotas} derrotas`);
@@ -772,9 +775,15 @@ function drawWall(t) {
     g.fillStyle = '#cfd4ff'; g.fillText(`${tr.vitorias}V ${tr.derrotas}D`, 1240, yb); });
   // notícias
   panel(1382, 646, 'NOTÍCIAS DO DIA', '#ffd25e');
-  NEWS.slice(0, 6).forEach((it, i) => { const y = top + 70 + i * 62; g.fillStyle = i === 0 ? 'rgba(255,210,94,.12)' : 'rgba(255,255,255,.03)'; g.beginPath(); g.roundRect(1396, y - 30, 618, 54, 10); g.fill();
-    g.fillStyle = '#ffd25e'; g.font = '700 20px "JetBrains Mono", monospace'; g.fillText(it.h, 1410, y + 4);
-    g.fillStyle = i === 0 ? '#fff' : '#cfd4ff'; g.font = `${i === 0 ? 700 : 500} 21px Inter, sans-serif`; let tx = it.txt; while (g.measureText(tx).width > 510 && tx.length > 4) tx = tx.slice(0, -2); g.fillText(tx === it.txt ? tx : tx + '…', 1490, y + 4); });
+  // a lista passa devagar: 6 por vez, avançando uma manchete a cada 6 s
+  const nn = NEWS.length, ini = nn > 6 ? Math.floor(t / 6) % nn : 0;
+  for (let i = 0; i < Math.min(6, nn); i++) { const it = NEWS[(ini + i) % nn], y = top + 70 + i * 62; g.fillStyle = i === 0 ? 'rgba(255,210,94,.12)' : 'rgba(255,255,255,.03)'; g.beginPath(); g.roundRect(1396, y - 30, 618, 56, 10); g.fill();
+    g.fillStyle = '#ffd25e'; g.font = '700 20px "JetBrains Mono", monospace'; g.fillText(it.h, 1410, y + (it.fonte ? -4 : 4));
+    if (it.fonte) { g.fillStyle = 'rgba(255,210,94,.75)'; g.font = '600 15px Inter, sans-serif'; let fo = it.fonte; while (g.measureText(fo).width > 72 && fo.length > 3) fo = fo.slice(0, -1); g.fillText(fo, 1410, y + 18); }
+    g.fillStyle = i === 0 ? '#fff' : '#cfd4ff'; g.font = `${i === 0 ? 700 : 500} 21px Inter, sans-serif`; const L = 510, ws = it.txt.split(' '); let l1 = '', l2 = '';
+    for (const w of ws) { if (!l2 && g.measureText(l1 + w).width < L) l1 += w + ' '; else l2 += w + ' '; }
+    if (l2) { g.font = `${i === 0 ? 700 : 500} 18px Inter, sans-serif`; l1 = ''; l2 = ''; for (const w of ws) { if (!l2 && g.measureText(l1 + w).width < L) l1 += w + ' '; else l2 += w + ' '; } while (g.measureText(l2).width > L && l2.length > 4) l2 = l2.slice(0, -3) + '…'; g.fillText(l1.trim(), 1490, y - 6); g.fillText(l2.trim(), 1490, y + 17); }
+    else g.fillText(l1.trim(), 1490, y + 4); }
   // frase motivacional (troca a cada 14 s, com fade)
   const fi = Math.floor(t / 14) % FRASES.length, ph = (t % 14) / 14, al = Math.min(1, ph * 8, (1 - ph) * 8);
   const fb = g.createLinearGradient(0, h - 66, w, h); fb.addColorStop(0, '#2a1a05'); fb.addColorStop(.5, '#3a2508'); fb.addColorStop(1, '#2a1a05'); g.fillStyle = fb; g.fillRect(0, h - 66, w, 66);
@@ -891,7 +900,7 @@ async function main() {
   if (dentroDoApp()) document.body.classList.add('embed');
   const lbar = $('#lbar'); const prog = (k) => { if (lbar) lbar.style.width = (k * 100) + '%'; };
   FURN = await loadFurniture(); prog(.2);
-  buildOffice(); noticiasIniciais(); drawWall(0); drawBoard(); news.forEach((n, i) => drawNews(n, i));
+  buildOffice(); noticiasIniciais(); buscarNoticias(); if (!REC) setInterval(buscarNoticias, 10 * 60e3); drawWall(0); drawBoard(); news.forEach((n, i) => drawNews(n, i));
   // pessoas: 2 corpos, 8 cabelos e 2 pacotes de movimentos
   const SRC = {}; const list = [M, F, 'UAL1_Standard', 'UAL2_Standard', ...['SimpleParted', 'SlickBack', 'Buzzed', 'Balding', 'Beard', 'Ponytail', 'Moustache', 'Dreads'].map(h => 'Hair_' + h)]; let done = 0;
   await Promise.all(list.map(async f => { SRC[f] = await loadPerson(f); prog(.2 + .8 * (++done / list.length)); }));
@@ -1006,5 +1015,5 @@ function loop() {
   updateFly(now); controls.update(); simulate(simT, dt); updateLabels(); composer.render(); requestAnimationFrame(loop);
 }
 window.__step = (t, dt, cam) => { simT = t; simulate(t, dt); if (cam) { camera.position.set(...cam.p); controls.target.set(...cam.t); camera.lookAt(controls.target); } updateLabels(); if (!window.__skip) composer.render(); };
-window.__api = { gtao, scene, legs: ORDER_LEGS, camera, controls, play, THREE, tab, startOrder, say, actors, SHOTS, flyTo, showCard, hideCard, drawBoard, traderCard, teamCard, studentCard, get STATE() { return STATE; }, get order() { return order; }, set auto(v) { autoTour = v; }, get WALK() { return WALK_SPEED; } };
+window.__api = { noticia, gtao, scene, legs: ORDER_LEGS, camera, controls, play, THREE, tab, startOrder, say, actors, SHOTS, flyTo, showCard, hideCard, drawBoard, traderCard, teamCard, studentCard, get STATE() { return STATE; }, get order() { return order; }, set auto(v) { autoTour = v; }, get WALK() { return WALK_SPEED; } };
 main().catch(e => { console.error(e); const l = $('#loading'); if (l) l.innerHTML = '<div style="font:600 16px Inter;padding:20px;text-align:center">Não foi possível carregar a cena.<br>' + e.message + '</div>'; });
