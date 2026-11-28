@@ -16,17 +16,21 @@ from .daytrade import _MultiTimeframe
 LONG, SHORT = Side.LONG, Side.SHORT
 
 
-def _upper(tl) -> Higher:
+def _upper(tl, minutes: int | None = None) -> Higher:
     """Tempo gráfico de cima para o swing: diário a partir do 60 min, semanal a partir do
-    diário. Um bloco só conta como fechado quando começa o seguinte (sem olhar o futuro)."""
-    intraday = tl.step < 24 * 60 and len(set(tl.dates[:50])) < len(tl.dates[:50])
-    key = (lambda d: d) if intraday else (lambda d: tuple(d.isocalendar())[:2])
+    diário (ou blocos fixos de `minutes`, no scalp). Um bloco só conta como fechado quando
+    começa o seguinte (sem olhar o futuro)."""
+    if minutes:
+        key = None
+    else:
+        intraday = tl.step < 24 * 60 and len(set(tl.dates[:50])) < len(tl.dates[:50])
+        key = (lambda d: d) if intraday else (lambda d: tuple(d.isocalendar())[:2])
     out: list[Bar] = []
     done_at: list[int] = []
     group: list[Bar] = []
     cur = None
     for i, b in enumerate(tl.bars):
-        k = key(tl.dates[i])
+        k = int(b.ts.timestamp() // (minutes * 60)) if minutes else key(tl.dates[i])
         if k != cur and group:
             out.append(Bar(group[0].ts, group[0].open, max(x.high for x in group), min(x.low for x in group), group[-1].close, sum(x.volume for x in group)))
             group = []
@@ -42,11 +46,16 @@ class _Setup(_MultiTimeframe):
     context_days = 5
     valid_bars = 1
 
-    def __init__(self, confluence: bool = False, swing: bool = False, **kw):
+    def __init__(self, confluence: bool = False, swing: bool = False, upper_minutes: int | None = None, **kw):
         super().__init__(**kw)
         self.confluence = confluence
-        self.swing = swing
-        if swing:
+        self.upper_minutes = upper_minutes  # scalp: tempo de cima em minutos (ex.: 60)
+        self.swing = swing = swing or bool(upper_minutes)
+        if upper_minutes:
+            self.day_trade = False
+            base = self.name.replace(" + 60 min", "").replace(" + 15 min", "").replace(" + 60/15 min", "")
+            self.name = f"{base} scalp" + (f" + {upper_minutes} min" if confluence else "")
+        elif swing:
             # swing: pode dormir posicionado; o tempo gráfico de cima é o diário (para o
             # 60 min) ou o semanal (para o diário)
             self.day_trade = False
@@ -57,12 +66,14 @@ class _Setup(_MultiTimeframe):
 
     @property
     def window(self) -> int:
+        if self.upper_minutes:
+            return 2000  # no 1 min, 21 candles de 60 min pedem mais de 1.260 candles
         return 400 if self.swing else super().window
 
     def _compute(self, tl):
         if not self.swing:
             return super()._compute(tl)
-        self.h1 = self.m15 = _upper(tl)
+        self.h1 = self.m15 = _upper(tl, self.upper_minutes)
         self._extra(tl)
 
     def decide(self, bars):

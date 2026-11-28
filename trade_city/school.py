@@ -119,6 +119,26 @@ SWING_SETUPS: list[Candidate] = [
     Candidate("IFR2 Stormer swing + tempo de cima", lambda: StormerIFR2(swing=True)),
 ]
 
+# scalp em cripto (gatilho de 1 e 5 min, tempo de cima de 60 min). Custo real da Binance:
+# 0,1% de taxa por lado mais 0,05% de derrapagem, cobrados pelo backtest
+SCALP_SETUPS: list[Candidate] = [
+    Candidate("Larry Williams 9.1 scalp + 60 min", lambda: LarryWilliams91(confluence=True, upper_minutes=60)),
+    Candidate("Larry Williams 9.2 scalp + 60 min", lambda: LarryWilliams92(confluence=True, upper_minutes=60)),
+    Candidate("Larry Williams 9.3 scalp + 60 min", lambda: LarryWilliams93(confluence=True, upper_minutes=60)),
+    Candidate("Stormer 123 scalp + 60 min", lambda: Stormer123(confluence=True, upper_minutes=60)),
+    Candidate("Ponto Contínuo MME21 scalp + 60 min", lambda: PontoContinuo(confluence=True, upper_minutes=60)),
+    Candidate("Falha de estrutura 2B scalp + 60 min", lambda: StructureFailure(upper_minutes=60)),
+    Candidate("Fibonacci 38-62% scalp + 60 min", lambda: FibonacciPullback(upper_minutes=60)),
+    Candidate("IFR2 scalp + 60 min", lambda: StormerIFR2(upper_minutes=60)),
+]
+
+SCALP_RISK_VARIANTS: list[RiskVariant] = [
+    RiskVariant("stop do gráfico, alvo 1,5x", 1.5, 1.5),
+    RiskVariant("stop do gráfico, alvo 2x", 1.5, 2.0),
+    RiskVariant("stop do gráfico, alvo 3x", 1.5, 3.0),
+    RiskVariant("stop do gráfico, saída do setup", 1.5, 50.0),
+]
+
 RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 2 ATR, alvo 2x", 2.0, 2.0),
     RiskVariant("stop 3 ATR, alvo 2x", 3.0, 2.0),
