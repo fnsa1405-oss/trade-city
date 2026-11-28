@@ -88,3 +88,48 @@ def collect(symbols: list[str], folder: str = "dados", log=print) -> None:
             _merge(found, regular_session(yahoo_bars(symbol, tf, 59)))
             save_csv(path, [found[k] for k in sorted(found)])
             log(f"{symbol} {tf}: {len(found)} candles guardados (+{len(found) - before})")
+
+
+# B3 --------------------------------------------------------------------------
+# O mini índice (WIN) não tem histórico intradiário gratuito. O Yahoo tem o próprio
+# Ibovespa (^BVSP), que o WIN acompanha no pregão, e o BOVA11 (ETF do Ibovespa), que traz
+# volume de verdade. O coletor guarda os dois todo dia útil para a escola testar o WIN
+# quando houver meses de histórico.
+B3_SYMBOLS = {"^BVSP": "IBOV", "BOVA11.SA": "BOVA11"}
+B3_SESSION = (10 * 60, 18 * 60)  # pregão de São Paulo, em minutos do dia
+
+
+def b3_session(bars: list[Bar]) -> list[Bar]:
+    from zoneinfo import ZoneInfo
+
+    sp = ZoneInfo("America/Sao_Paulo")
+    lo, hi = B3_SESSION
+    out = []
+    for b in bars:
+        t = b.ts.astimezone(sp)
+        if t.weekday() < 5 and lo <= t.hour * 60 + t.minute < hi:
+            out.append(b)
+    return out
+
+
+def collect_b3(folder: str = "dados", log=print, fetch=None) -> None:
+    """Coletor da B3: junta os candles recentes do Ibovespa e do BOVA11 ao que já está guardado."""
+    if fetch is None:
+        from .public_data import yahoo_bars as fetch
+
+    os.makedirs(folder, exist_ok=True)
+    for symbol, name in B3_SYMBOLS.items():
+        for tf in DAY_TIMEFRAMES:
+            path = csv_path(folder, name, tf)
+            found: dict = {}
+            if os.path.exists(path):
+                _merge(found, load_csv(path))
+            before = len(found)
+            try:
+                _merge(found, b3_session(fetch(symbol, tf, 59)))
+            except Exception as exc:
+                log(f"aviso: Yahoo falhou para {symbol} {tf}: {exc}")
+                continue
+            if found:
+                save_csv(path, [found[k] for k in sorted(found)])
+            log(f"{name} {tf}: {len(found)} candles guardados (+{len(found) - before})")

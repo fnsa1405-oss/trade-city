@@ -157,7 +157,7 @@ Uma réplica independente do ORB com custos ([mql5, 2026](https://www.mql5.com/e
 
 **Histórico intradiário:** o Yahoo só guarda 60 dias de 5 min e 30 dias de 1 min, pouco para a escola (que pede 30 operações no treino). Duas saídas:
 
-1. O workflow **Coleta de candles** guarda os candles de 5 e 1 min todo dia útil no branch `dados-intraday`. O histórico cresce sozinho.
+1. O workflow **Coleta de candles** guarda os candles de 5 e 1 min todo dia útil no branch `dados-intraday`. O histórico cresce sozinho. Desde 28/11/2026 também guarda o Ibovespa (`IBOV`, que o mini índice WIN acompanha) e o BOVA11 (com volume), no pregão da B3, para a escola testar o WIN quando houver meses de histórico (não há 2 anos de 1 min do WIN de graça).
 2. Com uma chave gratuita da [Massive](https://massive.com) (antiga Polygon.io) no segredo `MASSIVE_API_KEY` do repositório, a escola baixa cerca de 2 anos de candles de 1 min.
 
 1. **Backtest** de pelo menos 2 anos: fator de lucro acima de 1,3, queda máxima abaixo de 15% e pelo menos 100 operações. O comando `backtest` já diz se o trader passou.
