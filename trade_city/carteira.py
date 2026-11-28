@@ -197,7 +197,7 @@ def portfolio_report(traders: Sequence[TraderProfile], days: int = 2900, bars_fo
     end = min(bars[t.key][-1].ts.date() for t in approved)
     split = start + timedelta(days=int((end - start).days * 0.7))
 
-    base = RiskConfig()
+    base = RiskConfig(weekend_crypto_boost=1.0)  # o reforço de fim de semana é testado à parte
     base_runs = {t.key: run_backtest(t, bars[t.key], base) for t in approved}
     series = {k: daily_series(rep.trades, start, split - timedelta(days=1)) for k, rep in base_runs.items()}
     keys = [t.key for t in approved]

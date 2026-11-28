@@ -42,10 +42,10 @@ Escola de fluxo (28/11/2026): aprovadas Bia (BTC, rompimento 55 com agressão, 4
 `python -m trade_city carteira` (ou **Actions > Carteira**), em `trade_city/carteira.py`:
 
 - **Correlação** dos resultados diários: QQQ, SPY e DIA formam um grupo (até 0,63); as criptos quase não se correlacionam entre si nem com os índices.
-- **Paridade de risco**: cada grupo recebe a mesma fatia de risco e, dentro dele, o inverso da volatilidade. Resultado: cada cripto com peso 1,4 e cada índice com 0,47 (o risco por operação é multiplicado pelo peso). Com os pesos, a carteira rendeu mais que com todos iguais no treino e na prova.
-- **Risco por operação**: calibrado de 0,25% a 2% com o backtest completo. 0,5% continua o melhor: acima disso a trava de queda de 10% para Rui e Dora, e a prova piora.
+- **Paridade de risco**: cada grupo recebe a mesma fatia de risco e, dentro dele, o inverso da volatilidade. Resultado: cada cripto com peso 1,4 e cada índice com 0,47 (o risco por operação é multiplicado pelo peso). Com os pesos, a carteira rendeu +6,5% ao ano no treino e +1,8% na prova, contra +4,8% e +1,0% com todos iguais.
+- **Risco por operação**: calibrado de 0,25% a 2% com o backtest completo. 0,5% continua o escolhido: acima disso a trava de queda de 10% para Rui e Bia (o trader volta para a escola). A queda da carteira inteira fica pequena (até 8% em 2%), então o limite hoje é a trava por trader, não a carteira.
 - **Limites da carteira** no Auditor: risco aberto somado até 3% do capital total e até 1,5% por grupo correlacionado.
-- **Fim de semana**: testado dar 1,5x e 2x de risco às criptos no sábado e domingo; piorou a prova, então ficou desligado (`weekend_crypto_boost = 1`).
+- **Fim de semana** (pedido do Alexandre): no sábado e domingo de Nova York, com a bolsa fechada, as criptos operam com 1,5x o risco (`weekend_crypto_boost`). Na calibração com Bia e Dora novas, 1,5x subiu a prova de +1,8% para +2,3% ao ano com queda de 2,6%; 2x piorou o retorno por queda no treino.
 
 ## App da mesa ao vivo (celular)
 

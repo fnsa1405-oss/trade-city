@@ -59,4 +59,4 @@ def test_weekend_boost_only_for_crypto_on_weekends():
     assert weekend_multiplier(cfg, AssetClass.CRYPTO, sat) == 1.5
     assert weekend_multiplier(cfg, AssetClass.CRYPTO, mon) == 1.0
     assert weekend_multiplier(cfg, AssetClass.EQUITY, sat) == 1.0
-    assert weekend_multiplier(RiskConfig(), AssetClass.CRYPTO, sat) == 1.0
+    assert weekend_multiplier(RiskConfig(weekend_crypto_boost=1.0), AssetClass.CRYPTO, sat) == 1.0

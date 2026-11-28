@@ -27,7 +27,7 @@ class RiskConfig:
     max_cluster_risk: float = 0.015
     # fim de semana (sábado e domingo em Nova York, bolsa fechada): multiplica o risco das
     # criptos, que são as únicas que operam. Calibrado em carteira.py (1 = desligado)
-    weekend_crypto_boost: float = 1.0
+    weekend_crypto_boost: float = 1.5  # carteira 28/11/2026: 1,5x melhorou treino e prova
     daily_win_goal: int = 10
     profit_milestone: float = 100.0  # a cada marco de lucro (USD), um novo aprendiz é liberado
     timezone: str = "America/Sao_Paulo"  # define o "dia" do placar
