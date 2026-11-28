@@ -1,7 +1,7 @@
 {
  "versao": 1,
  "mesa": "swing",
- "gerado_em": "2026-11-28T02:39:59+00:00",
+ "gerado_em": "2026-11-28T05:12:57+00:00",
  "modo": "simulado",
  "travada": false,
  "travas": {
@@ -15,6 +15,30 @@
   "resultado": 0.0
  },
  "traders": [
+  {
+   "key": "sol",
+   "nome": "Sol Ventura",
+   "ativo": "SOL/USD",
+   "classe": "crypto",
+   "tempo": "1d",
+   "estrategia": "Momento de série temporal (28 candles)",
+   "persona": "Rápida e ousada: compra a Solana quando o retorno de 28 dias vira positivo.",
+   "humor": "normal",
+   "capital_inicial": 10000.0,
+   "capital": 10000.0,
+   "pico": 10000.0,
+   "lucro": 0.0,
+   "hoje": {
+    "vitorias": 0,
+    "derrotas": 0,
+    "resultado": 0.0,
+    "meta_vitorias": 10,
+    "max_derrotas": 5
+   },
+   "ultimo_candle": "2026-11-27T00:00:00+00:00",
+   "ultimos": [],
+   "posicao": null
+  },
   {
    "key": "rui",
    "nome": "Rui Xis",
@@ -35,7 +59,103 @@
     "meta_vitorias": 10,
     "max_derrotas": 5
    },
-   "ultimo_candle": "2026-11-27T20:00:00+00:00",
+   "ultimo_candle": "2026-11-28T00:00:00+00:00",
+   "ultimos": [],
+   "posicao": null
+  },
+  {
+   "key": "dora",
+   "nome": "Dora Doge",
+   "ativo": "DOGE/USD",
+   "classe": "crypto",
+   "tempo": "4h",
+   "estrategia": "Donchian em conjunto (Zarattini/Pagani/Barbon)",
+   "persona": "A mais animada do escritório: segue a maioria dos canais no Dogecoin.",
+   "humor": "normal",
+   "capital_inicial": 10000.0,
+   "capital": 10000.0,
+   "pico": 10000.0,
+   "lucro": 0.0,
+   "hoje": {
+    "vitorias": 0,
+    "derrotas": 0,
+    "resultado": 0.0,
+    "meta_vitorias": 10,
+    "max_derrotas": 5
+   },
+   "ultimo_candle": "2026-11-28T00:00:00+00:00",
+   "ultimos": [],
+   "posicao": null
+  },
+  {
+   "key": "teo",
+   "nome": "Teo Chip",
+   "ativo": "QQQ",
+   "classe": "equity",
+   "tempo": "1d",
+   "estrategia": "Turtle 20/10",
+   "persona": "Disciplinado e paciente: compra o Nasdaq 100 quando rompe a máxima de 20 dias.",
+   "humor": "normal",
+   "capital_inicial": 10000.0,
+   "capital": 10000.0,
+   "pico": 10000.0,
+   "lucro": 0.0,
+   "hoje": {
+    "vitorias": 0,
+    "derrotas": 0,
+    "resultado": 0.0,
+    "meta_vitorias": 10,
+    "max_derrotas": 5
+   },
+   "ultimo_candle": "2026-11-25T05:00:00+00:00",
+   "ultimos": [],
+   "posicao": null
+  },
+  {
+   "key": "lena",
+   "nome": "Dona Lena",
+   "ativo": "SPY",
+   "classe": "equity",
+   "tempo": "1d",
+   "estrategia": "Turtle 20/10",
+   "persona": "Paciente e experiente: compra o S&P 500 quando rompe a máxima de 20 dias.",
+   "humor": "normal",
+   "capital_inicial": 10000.0,
+   "capital": 10000.0,
+   "pico": 10000.0,
+   "lucro": 0.0,
+   "hoje": {
+    "vitorias": 0,
+    "derrotas": 0,
+    "resultado": 0.0,
+    "meta_vitorias": 10,
+    "max_derrotas": 5
+   },
+   "ultimo_candle": "2026-11-25T05:00:00+00:00",
+   "ultimos": [],
+   "posicao": null
+  },
+  {
+   "key": "davi",
+   "nome": "Davi Dow",
+   "ativo": "DIA",
+   "classe": "equity",
+   "tempo": "1d",
+   "estrategia": "Turtle 20/10",
+   "persona": "Veterano do pregão: compra o Dow Jones (DIA) quando rompe a máxima de 20 dias.",
+   "humor": "normal",
+   "capital_inicial": 10000.0,
+   "capital": 10000.0,
+   "pico": 10000.0,
+   "lucro": 0.0,
+   "hoje": {
+    "vitorias": 0,
+    "derrotas": 0,
+    "resultado": 0.0,
+    "meta_vitorias": 10,
+    "max_derrotas": 5
+   },
+   "ultimo_candle": null,
    "ultimos": [],
    "posicao": null
   }
@@ -59,7 +179,7 @@
    "key": "sol",
    "nome": "Sol Ventura",
    "ativo": "SOL/USD",
-   "situacao": "na escola"
+   "situacao": "na mesa"
   },
   {
    "key": "rui",
@@ -71,25 +191,25 @@
    "key": "dora",
    "nome": "Dora Doge",
    "ativo": "DOGE/USD",
-   "situacao": "na escola"
+   "situacao": "na mesa"
   },
   {
    "key": "teo",
    "nome": "Teo Chip",
    "ativo": "QQQ",
-   "situacao": "na escola"
+   "situacao": "na mesa"
   },
   {
    "key": "lena",
    "nome": "Dona Lena",
    "ativo": "SPY",
-   "situacao": "na escola"
+   "situacao": "na mesa"
   },
   {
    "key": "davi",
    "nome": "Davi Dow",
    "ativo": "DIA",
-   "situacao": "na escola"
+   "situacao": "na mesa"
   },
   {
    "key": "ivo",
