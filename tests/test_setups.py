@@ -159,3 +159,34 @@ def test_swing_setups_hold_overnight_and_use_weekly_context():
         rep = run_backtest(trader, bars, RiskConfig())
         multi_day += sum(t.closed_at.date() != t.opened_at.date() for t in rep.trades)
     assert multi_day > 0
+
+
+def test_scalp_setups_run_on_crypto_minutes_with_real_costs():
+    import random
+    from dataclasses import replace
+
+    from trade_city.config import TraderProfile
+    from trade_city.models import AssetClass
+    from trade_city.school import SCALP_RISK_VARIANTS, SCALP_SETUPS, evaluate
+    from trade_city.strategies.setups import _upper
+    from trade_city.intraday import Timeline
+
+    rng = random.Random(9)
+    t0, price, bars = datetime(2026, 1, 1, tzinfo=timezone.utc), 100.0, []
+    for k in range(3000):
+        o = price
+        price *= 1 + 0.00005 * (1 if (k // 300) % 2 == 0 else -1) + rng.gauss(0, 0.001)
+        bars.append(Bar(t0 + timedelta(minutes=k), o, max(o, price) * 1.0005, min(o, price) * 0.9995, price, 10))
+    up = _upper(Timeline.build(bars), 60)
+    assert len(up.bars) == 49 and up.done_at[59] == 0 and up.done_at[60] == 1
+    trader = TraderProfile("bia", "Bia", "teste", "BTC/USD", AssetClass.CRYPTO, "1min", SCALP_SETUPS[0].make(), capital=10_000)
+    for cand in SCALP_SETUPS:
+        s = cand.make()
+        assert "scalp" in s.name and not s.day_trade and s.window >= 2000
+    results = evaluate(trader, {"1min": bars}, candidates=SCALP_SETUPS, risks=SCALP_RISK_VARIANTS)
+    assert results
+    # taxa da Binance cobrada: nenhuma operação sai de graça
+    for r in results:
+        for t in r.train.trades:
+            gross = (t.exit_price - t.entry_price) * t.qty
+            assert t.pnl < gross

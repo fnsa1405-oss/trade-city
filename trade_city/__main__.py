@@ -203,7 +203,7 @@ def main(argv: list[str] | None = None) -> None:
     bt.add_argument("--salvar", help="salva os candles baixados neste CSV")
     esc = sub.add_parser("escola", help="testa várias estratégias e tempos gráficos por trader")
     esc.add_argument("trader", nargs="?", default="todos")
-    esc.add_argument("--modo", choices=["normal", "swing"], default="normal", help="swing = testa os índices também em swing (60 min e diário)")
+    esc.add_argument("--modo", choices=["normal", "swing", "scalp"], default="normal", help="swing = índices em swing (60 min e diário); scalp = criptos em 1 e 5 min")
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
     esc.add_argument("--dados", default="dados", help="pasta com os candles guardados pelo coletor")
@@ -267,6 +267,18 @@ def main(argv: list[str] | None = None) -> None:
             print(f"escola: {trader.name} ({trader.symbol})...", flush=True)
             try:
                 note = ""
+                if trader.asset_class is AssetClass.CRYPTO and args.modo == "scalp":
+                    from .school import SCALP_RISK_VARIANTS, SCALP_SETUPS
+
+                    series = {
+                        "1min": public_bars(trader.symbol, trader.asset_class, "1min", 90),
+                        "5min": public_bars(trader.symbol, trader.asset_class, "5min", 365),
+                    }
+                    note = "Modo scalp: " + "; ".join(f"{tf} {len(b)} candles" for tf, b in series.items()) + ". Custo: 0,1% de taxa + 0,05% de derrapagem por lado.\n"
+                    section = report_markdown(trader, evaluate(trader, series, candidates=SCALP_SETUPS, risks=SCALP_RISK_VARIANTS)) + note
+                    print(section, flush=True)
+                    parts.append(section)
+                    continue
                 if trader.asset_class is AssetClass.CRYPTO:
                     series = timeframes_for(trader, public_bars(trader.symbol, trader.asset_class, "1h", args.dias), "1h")
                 elif trader.day_trade and args.modo == "swing":

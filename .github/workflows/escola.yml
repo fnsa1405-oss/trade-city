@@ -21,9 +21,9 @@ on:
         options: [todos, bia, edu, sol, rui, dora, teo, lena, davi, ivo]
         default: todos
       modo:
-        description: "normal ou swing (índices em swing, 60 min e diário)"
+        description: "normal, swing (índices em 60 min e diário) ou scalp (criptos em 1 e 5 min)"
         type: choice
-        options: [normal, swing]
+        options: [normal, swing, scalp]
         default: normal
       dias:
         description: "Dias de histórico (cripto)"
