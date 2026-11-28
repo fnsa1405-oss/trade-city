@@ -10,6 +10,9 @@ from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSe
 @dataclass(frozen=True)
 class RiskConfig:
     risk_per_trade: float = 0.005  # 0,5% do capital do trader por operação
+    # micro futuros: se nem 1 contrato cabe no risco normal, aceita 1 contrato desde que o
+    # risco dele não passe disto (senão a operação é recusada)
+    max_contract_risk: float = 0.01
     atr_period: int = 14
     atr_stop_multiple: float = 2.0  # stop a 2 ATR da entrada
     reward_ratio: float = 2.0  # alvo = 2x o risco

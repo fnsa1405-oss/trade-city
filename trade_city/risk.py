@@ -27,7 +27,10 @@ class Guardian:
         capital: float,
         mood: Mood,
         asset_class: AssetClass,
+        unit_margin: float | None = None,
     ) -> tuple[TradePlan | None, str]:
+        """`unit_margin`: margem por contrato (micro futuros). Com ela, o limite de tamanho é a
+        margem, não o valor cheio, e a quantidade é sempre de contratos inteiros."""
         cfg = self.cfg
         volatility = atr(bars, cfg.atr_period)
         if volatility is None or volatility <= 0:
@@ -52,8 +55,13 @@ class Guardian:
         risk_budget = capital * cfg.risk_per_trade * mood.size_multiplier
         risk_budget = min(risk_budget, capital * cfg.risk_per_trade * Mood.CONFIANTE.size_multiplier)
         qty = risk_budget / stop_distance
-        qty = min(qty, capital / entry)  # sem alavancagem
-        qty = round_qty(qty, asset_class)
+        if unit_margin:
+            qty = float(math.floor(min(qty, capital / unit_margin)))
+            if qty == 0 and stop_distance <= capital * cfg.max_contract_risk:
+                qty = 1.0  # 1 contrato cabe na trava de risco máximo por operação
+        else:
+            qty = min(qty, capital / entry)  # sem alavancagem
+            qty = round_qty(qty, asset_class)
         if qty <= 0:
             return None, "capital insuficiente para o tamanho mínimo"
 

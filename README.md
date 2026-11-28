@@ -151,6 +151,8 @@ Leitura em vários tempos gráficos: o 60 min dá o contexto e a decisão, o 15 
 
 Nos gatilhos de 5 e 15 min, a escola confere entrada, stop e alvo minuto a minuto com os candles de 1 min. Sem isso, num candle que fez a mínima e depois rompeu a máxima, não dá para saber se o stop veio antes da entrada.
 
+**Microcontratos (padrão do day trade desde 28/11/2026):** a escola e o backtest simulam MNQ (Nasdaq), MES (S&P 500), MYM (Dow) e M2K (Russell) em vez dos ETFs. O preço do ETF vira o valor de 1 contrato, a quantidade é sempre de contratos inteiros, a derrapagem é de 1 tick e a corretagem é de US$0,85 por contrato por lado. A margem é de US$1.000 por contrato. Se nem 1 contrato cabe no risco normal (0,5%), a escola aceita 1 contrato com risco de até 1% do capital; acima disso, recusa a operação (`trade_city/futures.py`).
+
 Uma réplica independente do ORB com custos ([mql5, 2026](https://www.mql5.com/en/blogs/post/776235)) mostrou que a vantagem bruta quase some depois dos custos. Por isso a escola cobra custos e exige a prova fora da amostra.
 
 **Histórico intradiário:** o Yahoo só guarda 60 dias de 5 min e 30 dias de 1 min, pouco para a escola (que pede 30 operações no treino). Duas saídas:
