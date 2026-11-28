@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
-from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
-from .strategies.orderflow import DeltaBreakout
+from .strategies import DonchianEnsemble, MovingAverageTrend, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
+from .strategies.orderflow import DeltaBreakout, ORBDelta
 
 
 @dataclass(frozen=True)
@@ -52,6 +52,7 @@ class TraderProfile:
     # operação) e grupo de ativos correlacionados (limite de risco aberto por grupo)
     risk_weight: float = 1.0
     group: str = ""
+    micro: bool = False  # True = opera o microcontrato futuro do índice (futures.MICROS), não o ETF
 
 
 def weekend_multiplier(cfg: RiskConfig, asset_class: AssetClass, ts) -> float:
@@ -203,6 +204,42 @@ def default_traders() -> list[TraderProfile]:
             group="indices",
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
+        ),
+        TraderProfile(
+            key="mia",
+            name="Mia Média",
+            persona="Day trade no Dow com o microcontrato MYM: só opera a favor das médias e entra no candle de força.",
+            symbol="DIA",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1min",
+            strategy=MovingAverageTrend("forca", (60, 15, 5)),
+            data_lookback_days=50,  # a MMA200 do 60 min pede ~33 pregões de 1 min
+            # escola com microcontratos (28/11/2026, 2 anos de 1 min, 60 combinações a favor das
+            # médias): MME9 > MMA20 > MMA50 > MMA200 em 60/15/5 min, candle de força no 2 min.
+            # Treino 63 operações, fator de lucro 1,42; prova 27 operações, fator 1,34.
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=10.0,
+            day_trade=True,
+            micro=True,
+        ),
+        TraderProfile(
+            key="flora",
+            name="Flora Fluxo",
+            persona="Day trade no S&P com o microcontrato MES: segue a abertura só quando a agressão concorda.",
+            symbol="SPY",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1min",
+            strategy=ORBDelta(15, 0.2),
+            data_lookback_days=5,
+            # escola de fluxo com microcontratos (28/11/2026, 2 anos de 1 min, 72 combinações no SPY):
+            # ORB 15 min com delta estimado a favor, alvo 3x. Treino 101 operações, fator de lucro
+            # 1,63; prova 54 operações, fator 1,23 (queda de 9%, perto da trava de 10%).
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=3.0,
+            day_trade=True,
+            micro=True,
         ),
         TraderProfile(
             key="ivo",

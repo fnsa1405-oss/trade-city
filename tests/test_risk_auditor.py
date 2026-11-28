@@ -94,4 +94,4 @@ def test_risk_for_applies_school_adjustments():
     assert ivo.atr_stop_multiple == CFG.atr_stop_multiple and ivo.reward_ratio == 2.0
     assert risk_for(traders["rui"], CFG).reward_ratio == 50.0
     assert risk_for(traders["edu"], CFG) is CFG
-    assert {k for k, t in traders.items() if t.approved} == {"rui", "teo", "lena", "davi", "sol", "dora", "bia"}
+    assert {k for k, t in traders.items() if t.approved} == {"rui", "teo", "lena", "davi", "sol", "dora", "bia", "mia", "flora"}

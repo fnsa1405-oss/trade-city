@@ -22,9 +22,11 @@ Mesa de operações com traders de IA. Cada trader é especialista num ativo, e 
 | Sol Ventura (`sol`) | SOL/USD | diário | Momento de série temporal 28 | aprovada em 28/11/2026 (prova: fator de lucro 1,62) |
 | Dora Doge (`dora`) | DOGE/USD | 4h | Rompimento de 20 com agressão de compra (fluxo de ordens) | aprovada em 28/11/2026 na escola de fluxo (prova: fator de lucro 1,82; antes Donchian, 1,17) |
 | Davi Dow (`davi`) | DIA (Dow Jones) | swing, diário | Turtle 20/10 (Richard Dennis) | aprovado em 28/11/2026 (prova: fator de lucro 2,21) |
+| Mia Média (`mia`) | MYM (micro do Dow) | day trade, gatilho 2 min | Médias 200/50/20/9 empilhadas em 60/15/5 min + candle de força | aprovada em 28/11/2026 (prova: fator de lucro 1,34) |
+| Flora Fluxo (`flora`) | MES (micro do S&P 500) | day trade, gatilho 1 min | ORB 15 min com delta a favor, alvo 3x | aprovada em 28/11/2026 na escola de fluxo (prova: fator de lucro 1,23) |
 | Ivo Miúdo (`ivo`) | IWM (Russell 2000) | day trade, gatilho 1 min | ORB 5 min, alvo 2x | na escola (o cérebro tenta filtrar) |
 
-Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova (27/11/2026). A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
+Com 2 anos de candles de 1 min (Massive), nenhuma estratégia de day trade passou na prova em 27/11/2026; em 28/11/2026, com microcontratos, passaram Mia e Flora, que operam na Mesa day trade simulada. A aprovação anterior de Teo e Lena, feita com só 43 pregões, era sorte de amostra pequena e foi desfeita. Cada um ficou com a melhor estratégia do treino, e o cérebro tenta torná-la lucrativa.
 
 ## Fluxo de ordens (order flow)
 

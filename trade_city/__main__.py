@@ -90,7 +90,15 @@ def _desk(db: str, corretora: str = "simulada", grupo: str = "todos"):
     else:
         from .broker.paper import PaperBroker
 
-        broker = PaperBroker(ledger.conn, initial_cash=sum(t.capital for t in approved))
+        import os
+
+        from .broker.paper import PublicFeed
+        from .futures import MICROS
+
+        # day trade nos índices: microcontratos futuros (MNQ, MES, MYM, M2K)
+        contracts = {t.symbol: MICROS[t.symbol] for t in approved if t.micro and t.symbol in MICROS}
+        feed = PublicFeed(dados="dados" if os.path.isdir("dados") else None)
+        broker = PaperBroker(ledger.conn, feed=feed, initial_cash=sum(t.capital for t in approved), contracts=contracts)
     return Desk(approved, broker, ledger, brains=brains)
 
 

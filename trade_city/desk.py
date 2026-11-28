@@ -158,7 +158,9 @@ class Desk:
         stats = self.stats(trader)
         mood = self.mood(stats)
         risk = risk_for(trader, self.risk)
-        plan, detail = Guardian(risk).plan(signal, bars, stats.capital, mood, trader.asset_class)
+        micro = self.broker.contract_for(trader.symbol)
+        margin = micro.margin if micro is not None else None
+        plan, detail = Guardian(risk).plan(signal, bars, stats.capital, mood, trader.asset_class, unit_margin=margin)
         self.ledger.record_decision(now, trader.key, trader.symbol, "guardião", plan is not None, detail)
         if plan is None:
             return events + [f"[{trader.name}] guardião recusou: {detail}"]
@@ -175,6 +177,7 @@ class Desk:
             market_open=self.broker.is_market_open(trader.asset_class),
             asset_class=trader.asset_class,
             **self._portfolio_risk(trader),
+            unit_margin=margin,
         )
         audit = Auditor(risk).review(plan, ctx)
         self.ledger.record_decision(
@@ -191,8 +194,9 @@ class Desk:
         )
         mode = "simulado" if self.broker.paper else "REAL"
         verb = "comprou" if plan.side is Side.LONG else "vendeu a descoberto"
+        what = f"{micro.code} (microcontrato)" if micro is not None else trader.symbol
         return events + [
-            f"[{trader.name}] {verb} {qty:g} {trader.symbol} a {fill.price:.2f} ({mode}), "
+            f"[{trader.name}] {verb} {qty:g} {what} a {fill.price:.2f} ({mode}), "
             f"stop {plan.stop_loss:.2f}, alvo {plan.take_profit:.2f}"
         ]
 
