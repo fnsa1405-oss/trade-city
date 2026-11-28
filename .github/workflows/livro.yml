@@ -1,0 +1,45 @@
+name: Coleta do livro
+
+# Fotografa o livro de ofertas (Coinbase) e junta os negócios com o lado do agressor
+# (Coinbase e Binance) das criptos, a cada 15 s, e grava uma linha por minuto no branch
+# "dados-fluxo" (pasta livro/). Fica ligado em turnos de ~5h30, salvando a cada 55 min, e
+# no fim de cada turno chama o próximo (o cron do GitHub não dispara neste repositório).
+# Para religar pelo celular: Actions > Coleta do livro > Run workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: livro
+  cancel-in-progress: false
+
+jobs:
+  livro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Coletar e salvar a cada 55 min
+        run: |
+          WT="$RUNNER_TEMP/dados-fluxo"
+          git config --global user.name "trade-city-livro"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for turno in 1 2 3 4 5 6; do
+            git fetch -q --depth=1 origin dados-fluxo 2>/dev/null && FOUND=1 || FOUND=0
+            rm -rf "$WT"; git worktree prune
+            if [ "$FOUND" = 1 ]; then git worktree add -q -B dados-fluxo "$WT" FETCH_HEAD; else git worktree add -q --orphan -b dados-fluxo "$WT"; fi
+            python -m trade_city coletar-livro --pasta "$WT/livro" --minutos 55
+            ( cd "$WT" && git add -f livro && { git diff --cached --quiet || git commit -q -m "livro: $(date -u +%Y-%m-%dT%H:%M)"; } \
+              && for i in 1 2 3 4; do git pull -q --rebase origin dados-fluxo 2>/dev/null; git push -q origin HEAD:dados-fluxo && break; sleep $((i * 5)); done ) || echo "falha ao salvar o turno $turno"
+          done
+      - name: Chamar o próximo turno
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run livro.yml --ref main -R "$GITHUB_REPOSITORY"
