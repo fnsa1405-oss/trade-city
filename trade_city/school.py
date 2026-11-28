@@ -267,9 +267,16 @@ def evaluate(
     risks: Sequence[RiskVariant] | None = None,
     base_risk: RiskConfig = RiskConfig(),
     fine: Sequence[Bar] | None = None,
+    slippage_pct: float | None = None,
+    contract="auto",
 ) -> list[Result]:
     """`fine`: candles de 1 minuto, usados por dentro dos tempos gráficos maiores para saber
     em que ordem entrada, stop e alvo aconteceram."""
+    if contract == "auto":
+        # day trade nos índices: sempre com microcontratos futuros (pedido de 28/11/2026)
+        from .futures import MICROS
+
+        contract = MICROS.get(trader.symbol) if trader.day_trade else None
     if candidates is None:
         candidates = DAY_CANDIDATES if trader.day_trade else CANDIDATES
     if risks is None:
@@ -287,9 +294,9 @@ def evaluate(
                     continue  # sem alvo e sem regra de saída, a operação só termina no stop
                 risk = replace(base_risk, atr_stop_multiple=rv.atr_stop_multiple, reward_ratio=rv.reward_ratio)
                 student = replace(trader, strategy=cand.make(), timeframe=tf, atr_stop_multiple=None, reward_ratio=None)
-                train = run_backtest(student, train_bars, risk, fine=sub)
+                train = run_backtest(student, train_bars, risk, fine=sub, slippage_pct=slippage_pct, contract=contract)
                 warmup = max(student.strategy.window, risk.atr_period + 2)
-                test_full = run_backtest(replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk, fine=sub)
+                test_full = run_backtest(replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk, fine=sub, slippage_pct=slippage_pct, contract=contract)
                 test = _only_after(test_full, bars[split].ts)
                 results.append(Result(trader, tf, cand.label, rv.label, train, test))
     return results

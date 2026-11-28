@@ -106,9 +106,14 @@ def run_backtest(
     record_features: bool = False,
     brain=None,
     fine: Sequence[Bar] | None = None,
+    contract=None,
 ) -> BacktestReport:
     """Entradas no preço de abertura do candle seguinte ao sinal. Se stop e alvo cabem no mesmo
     candle, conta o stop (hipótese pessimista). Day trade nunca dorme posicionado.
+
+    `contract`: microcontrato futuro (futures.Micro). Os candles do ETF viram dólares por
+    contrato, a quantidade é inteira (contratos), a derrapagem é de 1 tick e a corretagem é
+    cobrada por contrato.
 
     `fine`: candles de 1 minuto do mesmo período. Com eles, entrada por ordem stop, stop e alvo
     são conferidos minuto a minuto dentro de cada candle, na ordem em que aconteceram."""
@@ -119,6 +124,21 @@ def run_backtest(
     if slippage_pct is None:
         day_equity = strategy.day_trade and trader.asset_class is AssetClass.EQUITY
         slippage_pct = DAY_TRADE_EQUITY_SLIPPAGE if day_equity else 0.0005
+    slip_abs = fee_abs = 0.0
+    unit_margin = None
+    if contract is not None:
+        from .futures import to_contract
+
+        bars, fine = to_contract(bars, contract), to_contract(fine, contract)
+        slippage_pct, fee_pct = 0.0, 0.0
+        slip_abs, fee_abs, unit_margin = contract.slip_value, contract.fee, contract.margin
+
+    def fill_in(price: float, sign: int) -> float:
+        return price * (1 + sign * slippage_pct) + sign * slip_abs
+
+    def fill_out(price: float, sign: int) -> float:
+        return price * (1 - sign * slippage_pct) - sign * slip_abs
+
     guardian, auditor = Guardian(risk), Auditor(risk)
     strategy.prepare(bars)
     report = BacktestReport(trader.name, trader.symbol, bars[0].ts if bars else None, bars[-1].ts if bars else None, trader.capital)
@@ -134,7 +154,7 @@ def run_backtest(
     def close(pos: _Position, price: float, ts: datetime, reason: str) -> None:
         nonlocal equity, peak
         qty, side = pos.plan.qty, pos.plan.side
-        pnl = (price - pos.entry) * qty * side.sign - fee_pct * (pos.entry + price) * qty
+        pnl = (price - pos.entry) * qty * side.sign - fee_pct * (pos.entry + price) * qty - 2 * fee_abs * qty
         report.trades.append(
             ClosedTrade(trader.key, trader.symbol, qty, pos.entry, price, pnl, pos.opened_at, ts, reason, side, pos.features)
         )
@@ -165,7 +185,7 @@ def run_backtest(
             sign = pending.side.sign
             low, high = sorted((pending.stop_loss, pending.take_profit))
             if pending_trigger is None:  # ordem a mercado na abertura
-                entry = bar.open * (1 + sign * slippage_pct)
+                entry = fill_in(bar.open, sign)
                 if low < entry < high:
                     position = _Position(pending, entry, bar.ts, pending_features)
                 pending = None
@@ -181,7 +201,7 @@ def run_backtest(
                 if k_hit is not None:
                     sb = subs[k_hit]
                     base = max(sb.open, pending_trigger) if long_order else min(sb.open, pending_trigger)
-                    entry = base * (1 + sign * slippage_pct)
+                    entry = fill_in(base, sign)
                     if low < entry < high:
                         position = _Position(pending, entry, sb.ts, pending_features)
                         first = fill_k = k_hit
@@ -195,7 +215,7 @@ def run_backtest(
             sign = plan.side.sign
             if strategy.day_trade and bar.ts.astimezone(NY).date() != position.opened_at.astimezone(NY).date():
                 # faltou candle no fim do pregão: sai na abertura seguinte, nunca carrega a posição
-                close(position, bar.open * (1 - sign * slippage_pct), bar.ts, "fim do pregão")
+                close(position, fill_out(bar.open, sign), bar.ts, "fim do pregão")
                 position = None
             else:
                 for k in range(first, len(subs)):
@@ -204,7 +224,7 @@ def run_backtest(
                         worst = min(sb.open, plan.stop_loss) if long else max(sb.open, plan.stop_loss)
                         if k == fill_k:
                             worst = plan.stop_loss  # a abertura veio antes da entrada; sai no stop
-                        close(position, worst * (1 - sign * slippage_pct), sb.ts, "stop loss")
+                        close(position, fill_out(worst, sign), sb.ts, "stop loss")
                         position = None
                         break
                     if k == fill_k:
@@ -215,7 +235,7 @@ def run_backtest(
                         position = None
                         break
                 if position is not None and strategy.exit_signal(bars[max(0, i + 1 - strategy.window) : i + 1], plan.side):
-                    close(position, bar.close * (1 - sign * slippage_pct), bar.ts, "saída da estratégia")
+                    close(position, fill_out(bar.close, sign), bar.ts, "saída da estratégia")
                     position = None
             if position is not None or not strategy.day_trade:
                 continue  # swing: espera o próximo candle; day trade pode entrar de novo
@@ -234,7 +254,7 @@ def run_backtest(
         mood = compute_mood(stats.recent_outcomes, stats.day_pnl)
         price = decision.trigger if decision.trigger is not None else bar.close
         signal = Signal(trader.key, trader.symbol, price, decision.reason, bar.ts, decision.side, decision.stop)
-        plan, _ = guardian.plan(signal, bars[max(0, i - risk.atr_period - 1) : i + 1], stats.capital, mood, trader.asset_class)
+        plan, _ = guardian.plan(signal, bars[max(0, i - risk.atr_period - 1) : i + 1], stats.capital, mood, trader.asset_class, unit_margin=unit_margin)
         if plan is None:
             report.rejected += 1
             continue
@@ -245,6 +265,7 @@ def run_backtest(
             day_pnl=stats.day_pnl,
             has_open_position=False,
             buying_power=stats.capital,
+            unit_margin=unit_margin,
         )
         audit = auditor.review(plan, ctx)
         if audit.approved:
