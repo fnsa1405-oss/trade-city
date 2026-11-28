@@ -118,11 +118,19 @@ class Ledger:
             return None
         return OpenTrade(*row[:7], opened_at=_dt(row[7]), side=Side(row[8]))
 
-    def close_trade(self, trade_id: int, exit_price: float, closed_at: datetime, reason: str) -> float:
+    def scale_trade(self, trade_id: int, qty: float, entry_price: float, stop_loss: float, take_profit: float) -> None:
+        """Entrada extra (preço médio ou pirâmide): nova quantidade, preço médio, stop e alvo."""
+        self.conn.execute(
+            "UPDATE trades SET qty = ?, entry_price = ?, stop_loss = ?, take_profit = ? WHERE id = ?",
+            (qty, entry_price, stop_loss, take_profit, trade_id),
+        )
+        self.conn.commit()
+
+    def close_trade(self, trade_id: int, exit_price: float, closed_at: datetime, reason: str, fees: float = 0.0) -> float:
         qty, entry, side = self.conn.execute(
             "SELECT qty, entry_price, side FROM trades WHERE id = ?", (trade_id,)
         ).fetchone()
-        pnl = (exit_price - entry) * qty * Side(side).sign
+        pnl = (exit_price - entry) * qty * Side(side).sign - fees
         self.conn.execute(
             "UPDATE trades SET closed_at = ?, exit_price = ?, pnl = ?, exit_reason = ? WHERE id = ?",
             (_iso(closed_at), exit_price, pnl, reason, trade_id),

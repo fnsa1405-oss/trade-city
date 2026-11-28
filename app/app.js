@@ -194,12 +194,65 @@ function desenhar() {
   $("#k-ops").textContent = resumo.ops;
   $("#k-acerto").textContent = resumo.ops ? `${Math.round((resumo.v / resumo.ops) * 100)}%` : "–";
 
+  desenharDias();
   desenharTraders(lista);
   desenharFeed(lista);
   desenharOperacoes();
   desenharElenco();
   $("#atualizado").textContent = ultimaMesa ? `mesa atualizada ${haQuanto(ultimaMesa)}` : "";
   avisar3D();
+}
+
+// resultado de cada dia: soma as duas mesas (day trade e swing) por data de São Paulo
+function desenharDias() {
+  const nomes = { day: "Day trade", swing: "Swing e cripto" };
+  const hojeISO = new Date().toLocaleDateString("en-CA", { timeZone: FUSO });
+  const porDia = new Map();
+  const hojeMesa = [];
+  for (const [chave, m] of Object.entries(estado.mesas)) {
+    let hoje = 0;
+    let opsHoje = 0;
+    for (const d of m.dias || []) {
+      const x = porDia.get(d.data) || { data: d.data, resultado: 0, operacoes: 0, vitorias: 0 };
+      x.resultado += d.resultado || 0;
+      x.operacoes += d.operacoes || 0;
+      x.vitorias += d.vitorias || 0;
+      porDia.set(d.data, x);
+      if (d.data === hojeISO) { hoje = d.resultado || 0; opsHoje = d.operacoes || 0; }
+    }
+    hojeMesa.push({ chave, nome: nomes[chave] || chave, hoje, opsHoje });
+  }
+  hojeMesa.sort((a, b) => (a.chave === "day" ? -1 : b.chave === "day" ? 1 : 0));
+  $("#hoje-mesas").innerHTML = hojeMesa.length
+    ? hojeMesa
+        .map(
+          (h) => `<div class="hoje-mesa"><span>${esc(h.nome)} hoje</span><strong class="num ${classe(h.hoje)}">${fmtSinal(h.hoje)}</strong>` +
+            `<em>${h.opsHoje ? `${h.opsHoje} operaç${h.opsHoje > 1 ? "ões" : "ão"}` : "sem operação fechada"}</em></div>`
+        )
+        .join("")
+    : "";
+  const dias = [...porDia.values()].sort((a, b) => (a.data < b.data ? -1 : 1)).slice(-20);
+  const box = $("#dias");
+  if (!dias.length) {
+    box.innerHTML = `<p class="vazio">Ainda não há dia fechado. O primeiro aparece aqui assim que uma operação terminar.</p>`;
+    $("#dias-resumo").textContent = "";
+    return;
+  }
+  const maior = Math.max(...dias.map((d) => Math.abs(d.resultado)), 1);
+  box.innerHTML = dias
+    .map((d) => {
+      const h = Math.max(4, Math.round((Math.abs(d.resultado) / maior) * 100));
+      const [, mes, dia] = d.data.split("-");
+      const tit = `${dia}/${mes}: ${fmtSinal(d.resultado)} em ${d.operacoes} operaç${d.operacoes > 1 ? "ões" : "ão"}`;
+      return `<div class="dia ${classe(d.resultado)}${d.data === hojeISO ? " hoje" : ""}" title="${esc(tit)}">` +
+        `<div class="dia-meio"><i style="height:${h / 2}%"></i></div><span>${dia}</span></div>`;
+    })
+    .join("");
+  const verdes = dias.filter((d) => d.resultado > 0).length;
+  const soma = dias.reduce((s, d) => s + d.resultado, 0);
+  $("#dias-resumo").innerHTML =
+    `<span><b class="pos">${verdes}</b> de ${dias.length} dias no verde</span>` +
+    `<span>média por dia <b class="num ${classe(soma)}">${fmtSinal(soma / dias.length)}</b></span>`;
 }
 
 function desenharTraders(lista) {

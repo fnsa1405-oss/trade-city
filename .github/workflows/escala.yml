@@ -1,0 +1,60 @@
+name: Escola do preço médio
+
+# Preço médio inteligente no day trade (pedido do Alexandre em 28/11/2026): cada estratégia
+# testa o preço médio para trás (até 3 entradas extras, stop único, risco total fixo) ou a
+# pirâmide a favor, contra ela mesma sem nada. Índices com microcontratos (MNQ, MES, MYM,
+# M2K) e cripto em day trade. Treino nos 70% iniciais, prova nos 30% finais, com custos.
+# Disparo manual pelo celular: aba Actions > Escola do preço médio > Run workflow.
+on:
+  pull_request:
+    paths:
+      - "trade_city/scaling.py"
+      - "trade_city/strategies/vwap.py"
+      - ".github/workflows/escala.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  escola:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        ativo: [QQQ, SPY, DIA, IWM, BTC/USD, ETH/USD, SOL/USD]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Abrir os candles guardados pela coleta
+        run: |
+          if git fetch --depth=1 origin dados-intraday; then
+            git worktree add -B dados-intraday "$RUNNER_TEMP/dados-intraday" FETCH_HEAD
+            ln -s "$RUNNER_TEMP/dados-intraday/dados" dados
+          else
+            echo "ainda não há candles guardados"
+          fi
+      - name: Rodar a escola
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+          ATIVO: ${{ matrix.ativo }}
+        run: |
+          python -m trade_city escola ivo --modo escala --ativo "$ATIVO" --saida escala.md
+          cat escala.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Guardar o relatório
+        if: always()
+        run: |
+          NOME=$(echo "$ATIVO" | tr '/' '-')
+          echo "NOME=$NOME" >> "$GITHUB_ENV"
+        env:
+          ATIVO: ${{ matrix.ativo }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: escala-${{ env.NOME }}
+          path: escala.md

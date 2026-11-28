@@ -343,3 +343,20 @@ button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-c
 .c-propostas li small { display: block; color: var(--texto-3); margin-top: 2px; overflow-wrap: anywhere; }
 .c-propostas li.p-sim strong { color: var(--verde); }
 .nota-conselho { font-size: 11px; color: var(--texto-3); margin: 10px 2px 0; }
+/* dia a dia */
+.hoje-mesas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.hoje-mesa { background: var(--vidro); border: 1px solid var(--borda); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.hoje-mesa span { font-size: 12px; color: var(--texto-2); }
+.hoje-mesa strong { font-size: 22px; font-weight: 700; }
+.hoje-mesa em { font-style: normal; font-size: 11px; color: var(--texto-3); }
+.dias { display: flex; align-items: stretch; gap: 4px; height: 120px; padding: 6px 2px; }
+.dia { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.dia-meio { flex: 1; width: 100%; position: relative; }
+.dia-meio::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--borda-forte); }
+.dia-meio i { position: absolute; left: 15%; right: 15%; border-radius: 4px; background: var(--texto-3); }
+.dia.pos .dia-meio i { bottom: 50%; background: var(--verde); }
+.dia.neg .dia-meio i { top: 50%; background: var(--vermelho); }
+.dia span { font: 500 10px/1 var(--mono); color: var(--texto-3); margin-top: 4px; }
+.dia.hoje span { color: var(--texto); font-weight: 700; }
+.dias-resumo { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--texto-2); margin-top: 6px; }
+.dias .vazio { color: var(--texto-3); font-size: 13px; margin: auto; text-align: center; }

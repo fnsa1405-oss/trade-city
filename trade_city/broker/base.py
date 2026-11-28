@@ -48,6 +48,10 @@ class Broker(ABC):
     def close_position(self, symbol: str) -> Fill:
         """Cancela ordens pendentes do ativo e zera a posição."""
 
+    def contract_for(self, symbol: str):
+        """Microcontrato futuro simulado neste ativo (ou None, se opera o próprio ativo)."""
+        return None
+
     @abstractmethod
     def last_exit_price(self, symbol: str) -> float | None:
         """Preço da última venda executada (quando um stop da corretora fechou a posição)."""

@@ -36,12 +36,41 @@ CREATE TABLE IF NOT EXISTS paper_orders (id INTEGER PRIMARY KEY, ts TEXT NOT NUL
 
 
 class PublicFeed:
-    """Preços das fontes públicas (Coinbase e Yahoo Finance)."""
+    """Preços das fontes públicas (Coinbase e Yahoo Finance).
+
+    `dados`: pasta do coletor (branch dados-intraday). Com ela, os candles de 1 e 5 min das
+    ações juntam o histórico guardado com os últimos dias do Yahoo, que só tem 30 dias de
+    1 min (as médias de 200 do 60 min pedem mais de 30 pregões)."""
+
+    def __init__(self, dados: str | None = None):
+        self.dados = dados
+        self._stored: dict = {}
 
     def get_bars(self, symbol: str, asset_class: AssetClass, timeframe: str, days: int) -> list[Bar]:
         from ..public_data import public_bars
 
+        if self.dados and asset_class is AssetClass.EQUITY and timeframe in ("1min", "5min"):
+            import os
+
+            from ..data import load_csv
+            from ..history import csv_path
+            from ..intraday import regular_session
+            from ..public_data import yahoo_bars
+
+            path = csv_path(self.dados, symbol, timeframe)
+            if os.path.exists(path):
+                key = (symbol, timeframe)
+                if key not in self._stored:  # o arquivo do coletor só muda uma vez por dia
+                    self._stored[key] = load_csv(path)
+                found = {b.ts: b for b in self._stored[key]}
+                found.update({b.ts: b for b in yahoo_bars(symbol, timeframe, 5)})
+                start = self.clock_now() - timedelta(days=days)
+                return [b for b in regular_session([found[k] for k in sorted(found)]) if b.ts >= start]
         return public_bars(symbol, asset_class, timeframe, days)
+
+    @staticmethod
+    def clock_now() -> datetime:
+        return datetime.now(timezone.utc)
 
     def latest_price(self, symbol: str, asset_class: AssetClass) -> float:
         from ..public_data import latest_price
@@ -64,9 +93,14 @@ class PaperBroker(Broker):
         clock: Callable[[], datetime] = _utcnow,
         crypto_fee: float = 0.001,
         slippage: float = 0.0005,
+        contracts: dict | None = None,
     ):
+        """`contracts`: ativo -> microcontrato futuro (futures.Micro). Nesses ativos, preço e
+        candles viram dólares por contrato, a quantidade é de contratos, o custo é 1 tick de
+        derrapagem mais a corretagem por lado, e o saldo reserva só a margem."""
         self.conn = conn
         self.feed = feed or PublicFeed()
+        self.contracts = dict(contracts or {})
         self.clock = clock
         self.crypto_fee = crypto_fee
         self.slippage = slippage
@@ -90,6 +124,20 @@ class PaperBroker(Broker):
     def _cost(self, asset_class: AssetClass) -> float:
         return self.slippage + (self.crypto_fee if asset_class is AssetClass.CRYPTO else 0.0)
 
+    def contract_for(self, symbol):
+        return self.contracts.get(symbol)
+
+    def _fill(self, symbol: str, asset_class: AssetClass, price: float, sign: int) -> float:
+        """Preço com custo: `sign` +1 piora para cima (compra), -1 para baixo (venda)."""
+        micro = self.contracts.get(symbol)
+        if micro is not None:
+            return price + sign * (micro.slip_value + micro.fee)  # 1 unidade = 1 contrato
+        return price * (1 + sign * self._cost(asset_class))
+
+    def _reserve(self, symbol: str, price: float, qty: float) -> float:
+        micro = self.contracts.get(symbol)
+        return micro.margin * qty if micro is not None else price * qty
+
     def _cash(self) -> float:
         return float(self.conn.execute("SELECT cash FROM paper_account WHERE id = 1").fetchone()[0])
 
@@ -105,10 +153,17 @@ class PaperBroker(Broker):
 
     # Broker -------------------------------------------------------------
     def get_bars(self, symbol, asset_class, timeframe, lookback_days):
-        return self.feed.get_bars(symbol, asset_class, timeframe, lookback_days)
+        bars = self.feed.get_bars(symbol, asset_class, timeframe, lookback_days)
+        micro = self.contracts.get(symbol)
+        if micro is not None:
+            from ..futures import to_contract
+
+            return to_contract(bars, micro)
+        return bars
 
     def latest_price(self, symbol, asset_class):
-        return float(self.feed.latest_price(symbol, asset_class))
+        micro = self.contracts.get(symbol)
+        return float(self.feed.latest_price(symbol, asset_class)) * (micro.scale if micro is not None else 1.0)
 
     def buying_power(self):
         return self._cash()
@@ -138,8 +193,8 @@ class PaperBroker(Broker):
         if plan.side is Side.SHORT and asset_class is AssetClass.CRYPTO:
             raise RuntimeError("cripto à vista não aceita venda a descoberto")
         sign = plan.side.sign
-        price = self.latest_price(symbol, asset_class) * (1 + sign * self._cost(asset_class))
-        cost = price * plan.qty  # na venda a descoberto, é a margem reservada
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), sign)
+        cost = self._reserve(symbol, price, plan.qty)  # na venda a descoberto, é a margem reservada
         if cost > self._cash() + 1e-6:
             raise RuntimeError("saldo simulado insuficiente")
         now = self.clock().isoformat()
@@ -158,9 +213,32 @@ class PaperBroker(Broker):
         if row is None:
             raise RuntimeError(f"sem posição simulada em {symbol}")
         asset_class, qty, sign = AssetClass(row[0]), row[1], Side(row[2]).sign
-        price = self.latest_price(symbol, asset_class) * (1 - sign * self._cost(asset_class))
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), -sign)
         order_id = self._exit(symbol, qty, price, "fechamento pela mesa")
         return Fill(order_id, price, qty)
+
+    def add_to_position(self, symbol: str, qty: float) -> Fill:
+        """Entrada extra (preço médio ou pirâmide) na posição aberta, a mercado."""
+        row = self.conn.execute("SELECT asset_class, qty, entry, side FROM paper_positions WHERE symbol = ?", (symbol,)).fetchone()
+        if row is None:
+            raise RuntimeError(f"sem posição simulada em {symbol}")
+        asset_class, old_qty, old_entry, side = AssetClass(row[0]), row[1], row[2], Side(row[3])
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), side.sign)
+        cost = self._reserve(symbol, price, qty)
+        if cost > self._cash() + 1e-6:
+            raise RuntimeError("saldo simulado insuficiente")
+        self._add_cash(-cost)
+        new_qty = old_qty + qty
+        avg = (old_entry * old_qty + price * qty) / new_qty
+        self.conn.execute("UPDATE paper_positions SET qty = ?, entry = ? WHERE symbol = ?", (new_qty, avg, symbol))
+        order_id = self._order(symbol, side.value, qty, price)
+        self.conn.commit()
+        return Fill(order_id, price, qty)
+
+    def set_stops(self, symbol: str, stop_loss: float, take_profit: float) -> None:
+        """Muda o stop e o alvo da posição inteira (ordem OCO na corretora)."""
+        self.conn.execute("UPDATE paper_positions SET stop_loss = ?, take_profit = ? WHERE symbol = ?", (stop_loss, take_profit, symbol))
+        self.conn.commit()
 
     def last_exit_price(self, symbol):
         row = self.conn.execute(
@@ -174,7 +252,7 @@ class PaperBroker(Broker):
         side = Side(side)
         self.conn.execute("DELETE FROM paper_positions WHERE symbol = ?", (symbol,))
         # devolve o que foi reservado na entrada mais o resultado
-        self._add_cash(entry * qty + (price - entry) * qty * side.sign)
+        self._add_cash(self._reserve(symbol, entry, qty) + (price - entry) * qty * side.sign)
         self.conn.execute(
             "INSERT INTO paper_exits (symbol, price, ts, reason) VALUES (?, ?, ?, ?)",
             (symbol, price, self.clock().isoformat(), reason),
@@ -189,29 +267,29 @@ class PaperBroker(Broker):
         asset_class = AssetClass(asset_value)
         sign = Side(side_value).sign
         long = sign > 0
-        cost = self._cost(asset_class)
         since = datetime.fromisoformat(last_check)
         now = self.clock()
         # ações: candles de 1 min (day trade); cripto: 1 h (a Coinbase pagina de 300 em 300)
         timeframe = "1min" if asset_class is AssetClass.EQUITY else "1h"
-        bars = self.feed.get_bars(symbol, asset_class, timeframe, (now - since).days + 2)
+        bars = self.get_bars(symbol, asset_class, timeframe, (now - since).days + 2)
+        out = lambda p: self._fill(symbol, asset_class, p, -sign)  # noqa: E731
         for bar in bars:
             if bar.ts < since:
                 continue  # candle começou antes da entrada ou já foi conferido
             if (bar.low <= stop) if long else (bar.high >= stop):
                 worst = min(bar.open, stop) if long else max(bar.open, stop)
-                self._exit(symbol, qty, worst * (1 - sign * cost), "stop loss")
+                self._exit(symbol, qty, out(worst), "stop loss")
                 return True
             if (bar.high >= take) if long else (bar.low <= take):
                 best = max(bar.open, take) if long else min(bar.open, take)
-                self._exit(symbol, qty, best * (1 - sign * cost), "stop gain")
+                self._exit(symbol, qty, out(best), "stop gain")
                 return True
         price = self.latest_price(symbol, asset_class)
         if (price - stop) * sign <= 0:
-            self._exit(symbol, qty, price * (1 - sign * cost), "stop loss")
+            self._exit(symbol, qty, out(price), "stop loss")
             return True
         if (price - take) * sign >= 0:
-            self._exit(symbol, qty, take * (1 - sign * cost), "stop gain")
+            self._exit(symbol, qty, out(take), "stop gain")
             return True
         self.conn.execute("UPDATE paper_positions SET last_check = ? WHERE symbol = ?", (now.isoformat(), symbol))
         self.conn.commit()

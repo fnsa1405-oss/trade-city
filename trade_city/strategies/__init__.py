@@ -23,10 +23,13 @@ from .setups import (
     StructureFailure,
 )
 from .trend import TrendFollower
+from .medias import MovingAverageTrend
+from .vwap import VwapBands
 from .wyckoff import WyckoffClimax, WyckoffSOSLPS, WyckoffSpring
 
 __all__ = [
     "Strategy",
+    "VwapBands",
     "TrendFollower",
     "OpeningRangeBreakout",
     "MeanReversion",
@@ -57,6 +60,7 @@ __all__ = [
     "WyckoffSpring",
     "WyckoffSOSLPS",
     "WyckoffClimax",
+    "MovingAverageTrend",
     "TimeSeriesMomentum",
     "TurnOfMonth",
     "IBSReversion",

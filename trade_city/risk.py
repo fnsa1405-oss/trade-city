@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
-from .config import RiskConfig
+from .config import RiskConfig, weekend_multiplier
 from .indicators import atr
 from .models import AssetClass, Bar, Side, Signal, TradePlan
 from .mood import Mood
@@ -52,8 +52,9 @@ class Guardian:
         if stop <= 0 or take <= 0:
             return None, "stop ou alvo ficariam abaixo de zero"
 
-        risk_budget = capital * cfg.risk_per_trade * mood.size_multiplier
-        risk_budget = min(risk_budget, capital * cfg.risk_per_trade * Mood.CONFIANTE.size_multiplier)
+        weekend = weekend_multiplier(cfg, asset_class, signal.ts)
+        risk_budget = capital * cfg.risk_per_trade * mood.size_multiplier * weekend
+        risk_budget = min(risk_budget, capital * cfg.risk_per_trade * Mood.CONFIANTE.size_multiplier * weekend)
         qty = risk_budget / stop_distance
         if unit_margin:
             qty = float(math.floor(min(qty, capital / unit_margin)))

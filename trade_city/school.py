@@ -13,6 +13,7 @@ from .backtest import BacktestReport, run_backtest
 from .config import RiskConfig, TraderProfile
 from .data import resample
 from .models import AssetClass, Bar, ClosedTrade
+from .scaling import MEDIA, PIRAMIDE, SEM_ESCALA, Scaling
 from .strategies import (
     ConnorsRSI2,
     CumulativeRSI,
@@ -33,6 +34,7 @@ from .strategies import (
     LarryWilliams93,
     MeanReversion,
     MondayAsiaOpen,
+    MovingAverageTrend,
     NoiseAreaMomentum,
     OpeningRangeDayTrade,
     PontoContinuo,
@@ -41,6 +43,7 @@ from .strategies import (
     Strategy,
     StructureFailure,
     Supertrend,
+    VwapBands,
     TrendFollower,
     TurtleBreakout,
     WilliamsBreakout,
@@ -54,6 +57,8 @@ from .strategies import (
 class Candidate:
     label: str
     make: Callable[[], Strategy]
+    timeframes: tuple[str, ...] | None = None  # só nestes tempos gráficos (None = todos)
+    scale_kind: str | None = None  # "media" ou "piramide": que tipo de preço médio combina com ela
 
 
 @dataclass(frozen=True)
@@ -173,6 +178,41 @@ DAY_CANDIDATES += WYCKOFF_DAY
 SWING_SETUPS += WYCKOFF_SWING
 CANDIDATES += WYCKOFF_SWING  # criptos (1h, 4h, diário) e índices em swing
 
+# day trade a favor das médias (pedido de 28/11/2026): MMA 200/50/20 e MME9 empilhadas nos
+# tempos de contexto e candle gatilho no 2 min (montado do 1 min) partindo da MME9/MMA20
+MEDIAS_ALIGN = ((60, 15, 5), (60, 15), (15, 5))
+MEDIAS_DAY: list[Candidate] = [
+    Candidate(MovingAverageTrend(t, a).name, lambda t=t, a=a: MovingAverageTrend(t, a), ("1min",))
+    for a in MEDIAS_ALIGN
+    for t in ("pc", "pfr", "engolfo", "martelo", "forca")
+]
+DAY_CANDIDATES += MEDIAS_DAY
+
+# preço médio inteligente (pedido de 28/11/2026). Cada estratégia só testa o tipo que
+# combina com ela: retorno à média -> preço médio para trás; tendência -> pirâmide.
+SCALE_CANDIDATES: list[Candidate] = [
+    Candidate("ORB 5 min (Zarattini/Aziz)", lambda: OpeningRangeDayTrade(5), None, PIRAMIDE),
+    Candidate("ORB 15 min", lambda: OpeningRangeDayTrade(15), None, PIRAMIDE),
+    Candidate("Área de ruído + VWAP (Zarattini/Aziz/Barbon)", lambda: NoiseAreaMomentum(14), None, PIRAMIDE),
+    Candidate("Médias 60/15/5 + candle de força (2 min)", lambda: MovingAverageTrend("forca", (60, 15, 5)), ("1min",), PIRAMIDE),
+    Candidate("Médias 60/15/5 + Ponto Contínuo (2 min)", lambda: MovingAverageTrend("pc", (60, 15, 5)), ("1min",), PIRAMIDE),
+    Candidate("Bandas da VWAP 2 desvios", lambda: VwapBands(2.0), None, MEDIA),
+    Candidate("Bandas da VWAP 2,5 desvios", lambda: VwapBands(2.5), None, MEDIA),
+    Candidate("Bandas da VWAP 2 desvios + 60 min", lambda: VwapBands(2.0, trend=True), None, MEDIA),
+    Candidate("IFR2 Stormer + 60 min", lambda: StormerIFR2(), None, MEDIA),
+    Candidate("Fibonacci 38-62% + 60/15 min", lambda: FibonacciPullback(), None, MEDIA),
+]
+
+SCALINGS: list[Scaling] = [
+    SEM_ESCALA,
+    Scaling(MEDIA, 2, 0.33),
+    Scaling(MEDIA, 2, 0.33, "medio", 1.0),
+    Scaling(MEDIA, 3, 0.25, "medio", 1.0),
+    Scaling(PIRAMIDE, 1, 1.0),
+    Scaling(PIRAMIDE, 2, 0.5),
+    Scaling(PIRAMIDE, 3, 1.0),
+]
+
 RISK_VARIANTS: list[RiskVariant] = [
     RiskVariant("stop 2 ATR, alvo 2x", 2.0, 2.0),
     RiskVariant("stop 3 ATR, alvo 2x", 3.0, 2.0),
@@ -208,6 +248,7 @@ class Result:
     risk: str
     train: BacktestReport
     test: BacktestReport
+    scaling: str = SEM_ESCALA.label
 
     def train_ok(self, rules: SchoolRules) -> bool:
         t = self.train
@@ -269,6 +310,7 @@ def evaluate(
     fine: Sequence[Bar] | None = None,
     slippage_pct: float | None = None,
     contract="auto",
+    scalings: Sequence[Scaling] = (SEM_ESCALA,),
 ) -> list[Result]:
     """`fine`: candles de 1 minuto, usados por dentro dos tempos gráficos maiores para saber
     em que ordem entrada, stop e alvo aconteceram."""
@@ -289,16 +331,24 @@ def evaluate(
         train_bars = bars[:split]
         sub = fine if fine and tf != "1min" else None
         for cand in candidates:
+            if cand.timeframes is not None and tf not in cand.timeframes:
+                continue
             for rv in risks:
                 if rv.reward_ratio >= 10 and not cand.make().has_exit:
                     continue  # sem alvo e sem regra de saída, a operação só termina no stop
-                risk = replace(base_risk, atr_stop_multiple=rv.atr_stop_multiple, reward_ratio=rv.reward_ratio)
-                student = replace(trader, strategy=cand.make(), timeframe=tf, atr_stop_multiple=None, reward_ratio=None)
-                train = run_backtest(student, train_bars, risk, fine=sub, slippage_pct=slippage_pct, contract=contract)
-                warmup = max(student.strategy.window, risk.atr_period + 2)
-                test_full = run_backtest(replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk, fine=sub, slippage_pct=slippage_pct, contract=contract)
-                test = _only_after(test_full, bars[split].ts)
-                results.append(Result(trader, tf, cand.label, rv.label, train, test))
+                for sc in scalings:
+                    if sc.active and cand.scale_kind not in (None, sc.mode):
+                        continue
+                    risk = replace(base_risk, atr_stop_multiple=rv.atr_stop_multiple, reward_ratio=rv.reward_ratio)
+                    student = replace(trader, strategy=cand.make(), timeframe=tf, atr_stop_multiple=None, reward_ratio=None)
+                    train = run_backtest(student, train_bars, risk, fine=sub, slippage_pct=slippage_pct, contract=contract, scaling=sc)
+                    warmup = max(student.strategy.window, risk.atr_period + 2)
+                    test_full = run_backtest(
+                        replace(student, strategy=cand.make()), bars[max(0, split - warmup) :], risk,
+                        fine=sub, slippage_pct=slippage_pct, contract=contract, scaling=sc,
+                    )
+                    test = _only_after(test_full, bars[split].ts)
+                    results.append(Result(trader, tf, cand.label, rv.label, train, test, sc.label))
     return results
 
 
@@ -327,18 +377,33 @@ def report_markdown(trader: TraderProfile, results: Sequence[Result], rules: Sch
     lines += [
         f"**{verdict}.** {len(results)} combinações testadas, {passed_train} passaram no treino.",
         "",
-        f"Melhor no treino: **{best.candidate}**, {best.timeframe}, {best.risk}",
+        f"Melhor no treino: **{best.candidate}**, {best.timeframe}, {best.risk}"
+        + (f", **{best.scaling}**" if best.scaling != SEM_ESCALA.label else ""),
         "",
-        "| Etapa | Período | Operações | Acerto | Fator de lucro | Resultado | Queda máx. |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Etapa | Período | Operações | Acerto | Fator de lucro | Resultado | Queda máx. | Dias com lucro | Média por dia |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for name, rep in (("treino", best.train), ("prova", best.test)):
         period = f"{rep.start:%Y-%m-%d} a {rep.end:%Y-%m-%d}" if rep.start and rep.end else "-"
+        days = rep.daily_pnl
+        per_day = sum(days.values()) / len(days) if days else 0.0
         lines.append(
             f"| {name} | {period} | {len(rep.trades)} | {rep.win_rate:.0%} | {_pf(rep.profit_factor)} | "
-            f"{rep.total_pnl / rep.base_capital:+.1%} | {rep.max_drawdown_pct:.1%} |"
+            f"{rep.total_pnl / rep.base_capital:+.1%} | {rep.max_drawdown_pct:.1%} | {rep.green_days:.0%} | {per_day:+.2f} |"
         )
     lines.append("")
+    if best.scaling != SEM_ESCALA.label:
+        plain = next(
+            (r for r in results if (r.timeframe, r.candidate, r.risk, r.scaling) == (best.timeframe, best.candidate, best.risk, SEM_ESCALA.label)),
+            None,
+        )
+        if plain is not None:
+            lines += [
+                f"Mesma estratégia sem preço médio: treino FL {_pf(plain.train.profit_factor)} "
+                f"({plain.train.total_pnl / plain.train.base_capital:+.1%}), prova FL {_pf(plain.test.profit_factor)} "
+                f"({plain.test.total_pnl / plain.test.base_capital:+.1%}).",
+                "",
+            ]
     return "\n".join(lines)
 
 
