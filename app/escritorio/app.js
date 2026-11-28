@@ -15,6 +15,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { HorizontalTiltShiftShader } from 'three/addons/shaders/HorizontalTiltShiftShader.js';
 import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
+import { criarCidade } from './cidade.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { obterAoVivo, assinar, dentroDoApp } from './aovivo.js';
@@ -174,14 +175,17 @@ for (let z = -D / 2 + .5; z <= D / 2; z += .5) bulbAt(-W / 2 + .1, H - .18 - .12
 /* ---------- cidade lá fora ---------- */
 const winTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#0d1236'; g.fillRect(0, 0, w, h); for (let y = 4; y < h; y += 8) for (let x = 3; x < w; x += 7) { const r = rnd(); if (r > .55) { g.fillStyle = r > .9 ? '#8fdcff' : '#ffc874'; g.fillRect(x, y, 4, 5); } } });
 winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping;
-for (let i = 0; i < 46; i++) {
-  const ang = -Math.PI * .05 + rnd() * Math.PI * .62 + Math.PI * .5; const rad = 34 + rnd() * 40;
-  const x = -Math.cos(ang) * rad * 1.2 - 4, z = -Math.abs(Math.sin(ang)) * rad - 6;
-  const w = 3 + rnd() * 5, h = 8 + rnd() * 26, d = 3 + rnd() * 5;
-  const t = winTex.clone(); t.needsUpdate = true; t.repeat.set(w / 4, h / 8);
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: 0x1a2050, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: .9, roughness: .8 }));
-  m.position.set(x, h / 2 - 2, z); scene.add(m);
-}
+// a torre e a cidade lá embaixo (prédios, casas, ruas com gente, carros e motos)
+const cidade = criarCidade(scene, { mobile: MOBILE });
+// guarda-corpo nas bordas abertas do terraço (frente e direita)
+{ const gm = new THREE.MeshPhysicalMaterial({ color: 0xbfe0ff, transparent: true, opacity: .06, roughness: .05, depthWrite: false, envMapIntensity: .12, side: THREE.DoubleSide }), rm = mat(0xcfd6e6, { roughness: .3, metalness: .7 });
+  const fz = D / 2 + .22, fx = W / 2 + .22;
+  const g1 = new THREE.Mesh(new THREE.PlaneGeometry(W + .44, 1.0), gm); g1.position.set(0, .5, fz); g1.userData.noAO = true; scene.add(g1);
+  const g2 = new THREE.Mesh(new THREE.PlaneGeometry(D + .44, 1.0), gm); g2.rotation.y = Math.PI / 2; g2.position.set(fx, .5, 0); g2.userData.noAO = true; scene.add(g2);
+  const h1 = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, W + .44, 8), rm); h1.rotation.z = Math.PI / 2; h1.position.set(0, 1.02, fz); scene.add(h1);
+  const h2 = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, D + .44, 8), rm); h2.rotation.x = Math.PI / 2; h2.position.set(fx, 1.02, 0); scene.add(h2);
+  for (let x = -W / 2; x <= W / 2 + .01; x += 2) { const p = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1.02, 6), rm); p.position.set(x, .51, fz); scene.add(p); }
+  for (let z = -D / 2; z < D / 2 + .01; z += 2) { const p = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1.02, 6), rm); p.position.set(fx, .51, z); scene.add(p); } }
 { const n = 500, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const a = rnd() * Math.PI * 2, e = .15 + rnd() * .8, r = 180; p[i * 3] = Math.cos(a) * Math.cos(e) * r; p[i * 3 + 1] = Math.sin(e) * r; p[i * 3 + 2] = Math.sin(a) * Math.cos(e) * r; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: .9, sizeAttenuation: true, fog: false }))); }
 const glowTex = canvasTex(128, 128, (g) => { const r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,245,225,1)'); r.addColorStop(.25, 'rgba(255,235,200,.9)'); r.addColorStop(.3, 'rgba(255,225,180,.35)'); r.addColorStop(1, 'rgba(255,220,170,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128); });
@@ -650,11 +654,13 @@ addEventListener('resize', resize);
 
 /* ================= câmera ================= */
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.dampingFactor = .07; controls.minDistance = 3; controls.maxDistance = 46;
+controls.enableDamping = true; controls.dampingFactor = .07; controls.minDistance = 3; controls.maxDistance = 150;
 controls.minPolarAngle = .35; controls.maxPolarAngle = 1.25; controls.target.set(0, .6, 0); controls.screenSpacePanning = false;
 camera.position.set(17, 17, 19);
 const SHOTS = {
   geral: { p: [17, 16, 19], t: [0, .3, 0] },
+  torre: { p: [62, 18, 84], t: [0, -22, 0] },
+  rua: { p: [16, -46, 62], t: [16, -63, 8] },
   mesa: { p: [-2.2, 3.6, 2.4], t: [-4.5, 1.0, -4.2] },
   rui: { p: [-6.9, 2.0, -7.4], t: [-8, 1.05, -4.3] }, teo: { p: [-3.4, 2.0, -7.4], t: [-4.5, 1.05, -4.3] }, lena: { p: [.1, 2.0, -7.4], t: [-1, 1.05, -4.3] },
   ordem: { p: [4, 8, 9], t: [-3, .6, -1] },
@@ -709,6 +715,7 @@ function tab(name) {
   if (name === 'ordem') { flyTo('ordem'); const fresh = !order; showCard(`<h4>CAMINHO DE UMA ORDEM${order && order.txt ? ' · AO VIVO' : ' · EXEMPLO'}</h4><ol class="steps">${['Rui propõe: COMPRA XRP', 'Nico confere a tendência', 'Rocha põe stop e alvo', 'Vera checa placar e trava', 'Corretora simulada executa'].map((s, i) => `<li id="st${i}">${s}</li>`).join('')}</ol>`); if (fresh) startOrder(); else { const n = order.leg + (order.phase === 'talk' ? 1 : 0); markStep(...[[0], [1, 2], [3], [4]].slice(0, n).flat()); } }
   if (name === 'escola') { flyTo('escola'); drawBoard(); showCard(STATE.aoVivo ? `<h4>BOLETIM DA ESCOLA</h4>${STATE.traders.map(t => `<div class="row"><b class="${t.situacao === 'na escola' ? '' : 'g'}">${t.situacao === 'na escola' ? '○' : '✓'} ${t.nome}</b><span class="m">${t.ativo.split(' ')[0]}</span><span class="pill">${t.situacao}</span></div>`).join('')}<p class="foot">Também estudando: ${STATE.escola.map(s => `${s.nome.split(' ')[0]} (${s.ativo})`).join(' · ')}</p>` : `<h4>BOLETIM DA ESCOLA</h4>${STATE.traders.map(t => `<div class="row"><b class="g">✓ ${t.nome}</b><span class="m">${t.ativo.split(' ')[0]}</span><span class="bar"><i style="width:${Math.min(100, t.pf_escola / 2 * 100)}%"></i></span><b>${t.pf_escola.toFixed(2).replace('.', ',')}</b></div>`).join('')}<p class="foot">Estudando: ${STATE.escola.map(s => `${s.nome.split(' ')[0]} (${s.ativo})`).join(' · ')}</p>`); }
   if (name === 'copa' || name === 'lounge' || name === 'reuniao') { flyTo(name); hideCard(); }
+  if (name === 'torre' || name === 'rua') { flyTo(name, 3); hideCard(); }
 }
 window.tab = tab;
 window.panico = () => {
@@ -829,13 +836,14 @@ async function main() {
   // reflexo de ambiente discreto em tudo (o ambiente ilumina, mas sem lavar a cena)
   scene.traverse(o => { const ms = o.material ? [].concat(o.material) : []; ms.forEach(m => { if (m.envMapIntensity === 1 && m.name !== 'glass') m.envMapIntensity = .28; }); });
   resize(); document.body.classList.add('ready');
-  if (!REC) { flyTo('geral', .1); requestAnimationFrame(loop); }
+  if (!REC) { { const s = SHOTS.torre; camera.position.copy(shotPos(s)); controls.target.set(...s.t); flyTo('geral', 4.5); } requestAnimationFrame(loop); }
   window.__ready = true;
 }
 
 /* ================= laço ================= */
 const clock = new THREE.Clock(); let scrIdx = 0; const tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3();
 function simulate(t, dt) {
+  cidade.atualizar(t, dt);
   mixers.forEach(m => m.update(dt));
   // vida de quem está sentado: cabeça olha devagar, mãos no teclado (ajuste pequeno e suave)
   Object.entries(actors).forEach(([k, p], i) => { const u = p.userData; if (u.sitting && t >= u.sitting) { sitPose(p, .2); u.sitting = 0; }
@@ -873,7 +881,7 @@ function loop() {
   const rawDt = clock.getDelta(); const dt = Math.min(rawDt, .05); simT += dt;
   // celular lento: desliga a oclusão e depois reduz a resolução, para manter a fluidez
   perfT += rawDt; perfN++; if (perfT > 3) { const avg = perfT / perfN; if (avg > .045 && gtao.enabled) gtao.enabled = false; else if (avg > .045 && renderer.getPixelRatio() > 1) { renderer.setPixelRatio(1); resize(); } perfT = 0; perfN = 0; } const now = performance.now() / 1000; idleT += dt;
-  if (autoTour && idleT > 25 && !fly) { const keys = STATE && STATE.aoVivo ? ['mesa', 'copa', 'escola', 'lounge', 'reuniao', 'geral'] : ['mesa', 'copa', 'ordem', 'escola', 'lounge', 'reuniao', 'geral']; tab(keys[Math.floor(now / 25) % keys.length]); }
+  if (autoTour && idleT > 25 && !fly) { const keys = STATE && STATE.aoVivo ? ['mesa', 'copa', 'torre', 'escola', 'lounge', 'rua', 'reuniao', 'geral'] : ['mesa', 'copa', 'ordem', 'torre', 'escola', 'lounge', 'rua', 'reuniao', 'geral']; tab(keys[Math.floor(now / 25) % keys.length]); }
   updateFly(now); controls.update(); simulate(simT, dt); updateLabels(); composer.render(); requestAnimationFrame(loop);
 }
 window.__step = (t, dt, cam) => { simT = t; simulate(t, dt); if (cam) { camera.position.set(...cam.p); controls.target.set(...cam.t); camera.lookAt(controls.target); } updateLabels(); if (!window.__skip) composer.render(); };
