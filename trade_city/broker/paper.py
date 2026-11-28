@@ -90,6 +90,28 @@ class PaperBroker(Broker):
     def _cost(self, asset_class: AssetClass) -> float:
         return self.slippage + (self.crypto_fee if asset_class is AssetClass.CRYPTO else 0.0)
 
+    @staticmethod
+    def _micro(symbol: str):
+        from ..futures import MICROS_BY_CODE
+
+        return MICROS_BY_CODE.get(symbol)
+
+    def _fill(self, symbol: str, asset_class: AssetClass, price: float, sign: int) -> float:
+        """Preço executado: micro futuro paga 1 tick; o resto, a derrapagem (e a taxa da cripto)."""
+        micro = self._micro(symbol)
+        if micro is not None:
+            return price + sign * micro.slip_value
+        return price * (1 + sign * self._cost(asset_class))
+
+    def _reserve(self, symbol: str, price: float, qty: float) -> float:
+        """Quanto do saldo fica preso: a margem no micro futuro, o valor cheio no resto."""
+        micro = self._micro(symbol)
+        return micro.margin * qty if micro is not None else price * qty
+
+    def _fee(self, symbol: str, qty: float) -> float:
+        micro = self._micro(symbol)
+        return micro.fee * qty if micro is not None else 0.0
+
     def _cash(self) -> float:
         return float(self.conn.execute("SELECT cash FROM paper_account WHERE id = 1").fetchone()[0])
 
@@ -138,12 +160,12 @@ class PaperBroker(Broker):
         if plan.side is Side.SHORT and asset_class is AssetClass.CRYPTO:
             raise RuntimeError("cripto à vista não aceita venda a descoberto")
         sign = plan.side.sign
-        price = self.latest_price(symbol, asset_class) * (1 + sign * self._cost(asset_class))
-        cost = price * plan.qty  # na venda a descoberto, é a margem reservada
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), sign)
+        cost = self._reserve(symbol, price, plan.qty)  # na venda a descoberto, é a margem reservada
         if cost > self._cash() + 1e-6:
             raise RuntimeError("saldo simulado insuficiente")
         now = self.clock().isoformat()
-        self._add_cash(-cost)
+        self._add_cash(-cost - self._fee(symbol, plan.qty))
         self.conn.execute(
             "INSERT INTO paper_positions (symbol, asset_class, qty, entry, stop_loss, take_profit, opened_at, last_check, side)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -158,9 +180,32 @@ class PaperBroker(Broker):
         if row is None:
             raise RuntimeError(f"sem posição simulada em {symbol}")
         asset_class, qty, sign = AssetClass(row[0]), row[1], Side(row[2]).sign
-        price = self.latest_price(symbol, asset_class) * (1 - sign * self._cost(asset_class))
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), -sign)
         order_id = self._exit(symbol, qty, price, "fechamento pela mesa")
         return Fill(order_id, price, qty)
+
+    def add_to_position(self, symbol: str, qty: float) -> Fill:
+        """Entrada extra (preço médio ou pirâmide) na posição aberta, a mercado."""
+        row = self.conn.execute("SELECT asset_class, qty, entry, side FROM paper_positions WHERE symbol = ?", (symbol,)).fetchone()
+        if row is None:
+            raise RuntimeError(f"sem posição simulada em {symbol}")
+        asset_class, old_qty, old_entry, side = AssetClass(row[0]), row[1], row[2], Side(row[3])
+        price = self._fill(symbol, asset_class, self.latest_price(symbol, asset_class), side.sign)
+        cost = self._reserve(symbol, price, qty)
+        if cost > self._cash() + 1e-6:
+            raise RuntimeError("saldo simulado insuficiente")
+        self._add_cash(-cost - self._fee(symbol, qty))
+        new_qty = old_qty + qty
+        avg = (old_entry * old_qty + price * qty) / new_qty
+        self.conn.execute("UPDATE paper_positions SET qty = ?, entry = ? WHERE symbol = ?", (new_qty, avg, symbol))
+        order_id = self._order(symbol, side.value, qty, price)
+        self.conn.commit()
+        return Fill(order_id, price, qty)
+
+    def set_stops(self, symbol: str, stop_loss: float, take_profit: float) -> None:
+        """Muda o stop e o alvo da posição inteira (ordem OCO na corretora)."""
+        self.conn.execute("UPDATE paper_positions SET stop_loss = ?, take_profit = ? WHERE symbol = ?", (stop_loss, take_profit, symbol))
+        self.conn.commit()
 
     def last_exit_price(self, symbol):
         row = self.conn.execute(
@@ -173,8 +218,8 @@ class PaperBroker(Broker):
         entry, side = self.conn.execute("SELECT entry, side FROM paper_positions WHERE symbol = ?", (symbol,)).fetchone()
         side = Side(side)
         self.conn.execute("DELETE FROM paper_positions WHERE symbol = ?", (symbol,))
-        # devolve o que foi reservado na entrada mais o resultado
-        self._add_cash(entry * qty + (price - entry) * qty * side.sign)
+        # devolve o que foi reservado na entrada mais o resultado (menos a corretagem do micro)
+        self._add_cash(self._reserve(symbol, entry, qty) + (price - entry) * qty * side.sign - self._fee(symbol, qty))
         self.conn.execute(
             "INSERT INTO paper_exits (symbol, price, ts, reason) VALUES (?, ?, ?, ?)",
             (symbol, price, self.clock().isoformat(), reason),
@@ -189,7 +234,6 @@ class PaperBroker(Broker):
         asset_class = AssetClass(asset_value)
         sign = Side(side_value).sign
         long = sign > 0
-        cost = self._cost(asset_class)
         since = datetime.fromisoformat(last_check)
         now = self.clock()
         # ações: candles de 1 min (day trade); cripto: 1 h (a Coinbase pagina de 300 em 300)
@@ -200,18 +244,18 @@ class PaperBroker(Broker):
                 continue  # candle começou antes da entrada ou já foi conferido
             if (bar.low <= stop) if long else (bar.high >= stop):
                 worst = min(bar.open, stop) if long else max(bar.open, stop)
-                self._exit(symbol, qty, worst * (1 - sign * cost), "stop loss")
+                self._exit(symbol, qty, self._fill(symbol, asset_class, worst, -sign), "stop loss")
                 return True
             if (bar.high >= take) if long else (bar.low <= take):
                 best = max(bar.open, take) if long else min(bar.open, take)
-                self._exit(symbol, qty, best * (1 - sign * cost), "stop gain")
+                self._exit(symbol, qty, self._fill(symbol, asset_class, best, -sign), "stop gain")
                 return True
         price = self.latest_price(symbol, asset_class)
         if (price - stop) * sign <= 0:
-            self._exit(symbol, qty, price * (1 - sign * cost), "stop loss")
+            self._exit(symbol, qty, self._fill(symbol, asset_class, price, -sign), "stop loss")
             return True
         if (price - take) * sign >= 0:
-            self._exit(symbol, qty, take * (1 - sign * cost), "stop gain")
+            self._exit(symbol, qty, self._fill(symbol, asset_class, take, -sign), "stop gain")
             return True
         self.conn.execute("UPDATE paper_positions SET last_check = ? WHERE symbol = ?", (now.isoformat(), symbol))
         self.conn.commit()

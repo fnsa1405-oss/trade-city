@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
+from .scaling import Scaling
 from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
 
 
@@ -40,6 +41,13 @@ class TraderProfile:
     atr_stop_multiple: float | None = None  # ajuste de stop aprovado na escola (None = padrão)
     reward_ratio: float | None = None  # ajuste de alvo aprovado na escola (None = padrão)
     day_trade: bool = False  # True = a escola testa só day trade (gatilho de 5 ou 1 min)
+    contract: str | None = None  # micro futuro operado na mesa (MNQ, MES, MYM, M2K); symbol = o ETF dos dados
+    scaling: Scaling | None = field(default=None, compare=False)  # preço médio/pirâmide aprovado na escola
+
+    @property
+    def ticker(self) -> str:
+        """O que a mesa compra e vende: o micro futuro, se houver, senão o próprio ativo."""
+        return self.contract or self.symbol
 
 
 def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:
