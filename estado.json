@@ -1,7 +1,7 @@
 {
  "versao": 1,
  "mesa": "swing",
- "gerado_em": "2026-11-28T07:59:44+00:00",
+ "gerado_em": "2026-11-28T08:01:54+00:00",
  "modo": "simulado",
  "travada": false,
  "travas": {
@@ -59,7 +59,7 @@
     "meta_vitorias": 10,
     "max_derrotas": 5
    },
-   "ultimo_candle": "2026-11-28T00:00:00+00:00",
+   "ultimo_candle": "2026-11-28T04:00:00+00:00",
    "ultimos": [],
    "posicao": null
   },
@@ -83,7 +83,7 @@
     "meta_vitorias": 10,
     "max_derrotas": 5
    },
-   "ultimo_candle": "2026-11-28T00:00:00+00:00",
+   "ultimo_candle": "2026-11-28T04:00:00+00:00",
    "ultimos": [],
    "posicao": null
   },
