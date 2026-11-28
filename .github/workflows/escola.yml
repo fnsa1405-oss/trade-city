@@ -18,7 +18,7 @@ on:
       trader:
         description: "Qual trader"
         type: choice
-        options: [todos, bia, edu, sol, rui, dora, teo, lena, davi, ivo]
+        options: [todos, bia, edu, sol, rui, dora, teo, lena, davi, mia, flora, levy, ivo]
         default: todos
       modo:
         description: "normal, swing (índices em 60 min e diário) ou scalp (criptos em 1 e 5 min)"

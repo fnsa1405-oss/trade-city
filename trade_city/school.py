@@ -35,6 +35,7 @@ from .strategies import (
     MeanReversion,
     MondayAsiaOpen,
     MovingAverageTrend,
+    PivotV2,
     NoiseAreaMomentum,
     OpeningRangeDayTrade,
     PontoContinuo,
@@ -188,6 +189,20 @@ MEDIAS_DAY: list[Candidate] = [
 ]
 DAY_CANDIDATES += MEDIAS_DAY
 
+# Pivô v2 do Levy (dossiê de 26/11/2026): a regra oficial dele é 2 min, camada 3, alvo 1.
+# A escola também testa o gráfico de 1 min, a camada 2 (alinhado à M20) e os alvos 2 e 3,
+# escolhe no treino e confirma na prova, como faz com todo mundo.
+PIVO_DAY: list[Candidate] = [
+    Candidate(PivotV2(alvo, camada, grafico).name, lambda a=alvo, c=camada, g=grafico: PivotV2(a, c, g), ("1min",))
+    for grafico in (2, 1)
+    for camada in (3, 2)
+    for alvo in (1, 2, 3)
+]
+# o stop e o alvo vêm do gráfico (stop A e projeção de Fibonacci); o ATR só entra se faltar
+PIVO_RISK_VARIANTS: list[RiskVariant] = [RiskVariant("stop A, alvo pela projeção de Fibonacci", 2.0, 2.0)]
+# trader com método próprio (TraderProfile.school): só as estratégias dele vão para a prova
+SCHOOL_SETS = {"pivo": (PIVO_DAY, PIVO_RISK_VARIANTS)}
+
 # preço médio inteligente (pedido de 28/11/2026). Cada estratégia só testa o tipo que
 # combina com ela: retorno à média -> preço médio para trás; tendência -> pirâmide.
 SCALE_CANDIDATES: list[Candidate] = [
@@ -319,10 +334,11 @@ def evaluate(
         from .futures import MICROS
 
         contract = MICROS.get(trader.symbol) if trader.day_trade else None
+    own = SCHOOL_SETS.get(trader.school)
     if candidates is None:
-        candidates = DAY_CANDIDATES if trader.day_trade else CANDIDATES
+        candidates = own[0] if own else DAY_CANDIDATES if trader.day_trade else CANDIDATES
     if risks is None:
-        risks = DAY_RISK_VARIANTS if trader.day_trade else RISK_VARIANTS
+        risks = own[1] if own else DAY_RISK_VARIANTS if trader.day_trade else RISK_VARIANTS
     results = []
     for tf, bars in series.items():
         if len(bars) < 300:
@@ -423,7 +439,12 @@ def current_check(trader: TraderProfile, series: dict[str, list[Bar]], rules: Sc
         return ""
     r = res[0]
     ok = r.train_ok(rules) and r.test_ok(rules)
-    verdict = "continua aprovada" if ok else "não passa mais"
+    if trader.approved:
+        verdict = "continua aprovada" if ok else "não passa mais"
+    else:
+        verdict = "aprovada" if ok else "reprovada"
+    if r.train.halted_at or r.test.halted_at:
+        verdict += " (parada pela trava de queda de 10%)"
     return (
         f"Estratégia atual ({trader.strategy.name}, {trader.timeframe}): **{verdict}**. "
         f"Treino: {len(r.train.trades)} operações, fator de lucro {_pf(r.train.profit_factor)}; "

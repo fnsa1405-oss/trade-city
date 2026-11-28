@@ -320,7 +320,7 @@ def run_backtest(
         stats = compute_stats(trader.capital, [p for _, p in pnls], [p for ts, p in pnls if ts >= today])
         mood = compute_mood(stats.recent_outcomes, stats.day_pnl)
         price = decision.trigger if decision.trigger is not None else bar.close
-        signal = Signal(trader.key, trader.symbol, price, decision.reason, bar.ts, decision.side, decision.stop)
+        signal = Signal(trader.key, trader.symbol, price, decision.reason, bar.ts, decision.side, decision.stop, decision.target)
         plan, _ = guardian.plan(signal, bars[max(0, i - risk.atr_period - 1) : i + 1], stats.capital, mood, trader.asset_class, unit_margin=unit_margin)
         if plan is None:
             report.rejected += 1

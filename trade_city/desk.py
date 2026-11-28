@@ -110,7 +110,7 @@ class Desk:
                 self.ledger.record_decision(now, trader.key, trader.symbol, "analista", False, "ordem stop venceu sem romper")
             elif (price - order["trigger"]) * side.sign >= 0:
                 self.ledger.set_flag(pend_key, "")
-                signal = Signal(trader.key, trader.symbol, price, order["reason"], now, side, order["stop"])
+                signal = Signal(trader.key, trader.symbol, price, order["reason"], now, side, order["stop"], order.get("target"))
                 return self._execute(trader, signal, bars, [f"[{trader.name}] rompeu {order['trigger']:.2f}: {order['reason']}"])
             else:
                 return []
@@ -145,12 +145,12 @@ class Desk:
         if decision.trigger is not None:
             step = bars[-1].ts - bars[-2].ts if len(bars) > 1 else timedelta(minutes=5)
             expires = bars[-1].ts + step * (1 + decision.valid_bars)
-            order = {"side": decision.side.value, "trigger": decision.trigger, "stop": decision.stop, "reason": reason, "expires": expires.isoformat()}
+            order = {"side": decision.side.value, "trigger": decision.trigger, "stop": decision.stop, "target": decision.target, "reason": reason, "expires": expires.isoformat()}
             self.ledger.set_flag(pend_key, json.dumps(order))
             verb = "compra acima de" if decision.side is Side.LONG else "venda abaixo de"
             return events + [f"[{trader.name}] ordem stop armada: {verb} {decision.trigger:.2f}"]
         price = self.broker.latest_price(trader.symbol, trader.asset_class)
-        signal = Signal(trader.key, trader.symbol, price, reason, now, decision.side, decision.stop)
+        signal = Signal(trader.key, trader.symbol, price, reason, now, decision.side, decision.stop, decision.target)
         return self._execute(trader, signal, bars, events)
 
     def _execute(self, trader: TraderProfile, signal: Signal, bars, events: list[str]) -> list[str]:

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
 from .scaling import PIRAMIDE, Scaling
-from .strategies import DonchianEnsemble, MovingAverageTrend, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
+from .strategies import DonchianEnsemble, MovingAverageTrend, OpeningRangeDayTrade, PivotV2, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
 from .strategies.orderflow import DeltaBreakout, ORBDelta
 
 
@@ -54,6 +54,10 @@ class TraderProfile:
     risk_weight: float = 1.0
     group: str = ""
     micro: bool = False  # True = opera o microcontrato futuro do índice (futures.MICROS), não o ETF
+    # alvo mínimo do Auditor (None = padrão 1,5x). Só para método de alvo curto e acerto alto
+    # (Levy: alvo na projeção de 61%, ganho típico de 1R), conferido pela escola
+    min_reward_ratio: float | None = None
+    school: str = ""  # conjunto próprio de estratégias na escola (ex.: "pivo"); vazio = o da casa
     scaling: Scaling | None = field(default=None, compare=False)  # preço médio/pirâmide aprovado na escola
 
 
@@ -75,6 +79,8 @@ def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:
         changes["atr_stop_multiple"] = trader.atr_stop_multiple
     if trader.reward_ratio is not None:
         changes["reward_ratio"] = trader.reward_ratio
+    if trader.min_reward_ratio is not None:
+        changes["min_reward_ratio"] = trader.min_reward_ratio
     return replace(base, **changes) if changes else base
 
 
@@ -247,6 +253,29 @@ def default_traders() -> list[TraderProfile]:
             reward_ratio=3.0,
             day_trade=True,
             micro=True,
+        ),
+        TraderProfile(
+            key="levy",
+            name="Levy Pivô",
+            persona=(
+                "Pesquisador e disciplinado: um setup só, o Pivô no 2 min do Nasdaq (micro MNQ). "
+                "Sem critério, sem trade. Pensa em amostras, não em um trade."
+            ),
+            symbol="QQQ",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1min",
+            # regra oficial do dossiê (26/11/2026): 2 min, camada 3, sempre sai no alvo 1
+            strategy=PivotV2(target=1, layer=3, chart=2),
+            capital=25_000.0,  # o tamanho da conta Flex 25K que ele usa na mesa proprietária
+            data_lookback_days=5,
+            atr_stop_multiple=2.0,
+            reward_ratio=2.0,  # não usado: o alvo vem da projeção de Fibonacci
+            # alvo 1 rende ~1R (0,52R a 2,42R no backtest dele): o piso de 1,5x do Auditor
+            # cortaria o método inteiro, então o piso dele é 0,5x. As outras travas são as da casa.
+            min_reward_ratio=0.5,
+            day_trade=True,
+            micro=True,
+            school="pivo",
         ),
         TraderProfile(
             key="ivo",

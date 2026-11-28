@@ -43,7 +43,7 @@ function montarElenco(s, vivo) {
   if (!vivo.elenco || !vivo.elenco.length) return;
   const base = {}; [...s.traders, ...s.escola].forEach(p => base[p.key] = p);
   const naMesa = (vivo.traders || []).map(t => t.key).filter((k, i, a) => a.indexOf(k) === i).slice(0, 12);
-  const ficha = (e, i) => { const b = base[e.key] || {}; return { ...b, key: e.key, nome: e.nome, ativo: e.ativo, cor: b.cor || CORES[i % CORES.length], pf_escola: b.pf_escola || 0, humor: b.humor || 'normal', vitorias: 0, derrotas: 0, capital: b.capital || 10000, posicao: 'nenhuma', fala: b.fala || 'Foco no plano.', estrategia: b.estrategia || '' }; };
+  const ficha = (e, i) => { const b = base[e.key] || {}; return { ...b, key: e.key, nome: e.nome, ativo: e.ativo, cor: b.cor || CORES[i % CORES.length], pf_escola: b.pf_escola || 0, humor: b.humor || 'normal', vitorias: 0, derrotas: 0, capital: b.capital || 10000, posicao: 'nenhuma', fala: b.fala || 'Foco no plano.', estrategia: b.estrategia || '', persona: e.persona || b.persona || '' }; };
   const porKey = Object.fromEntries(vivo.elenco.map(e => [e.key, e]));
   s.traders = naMesa.map((k, i) => ficha(porKey[k] || { key: k, nome: k, ativo: '' }, i));
   s.escola = vivo.elenco.filter(e => !naMesa.includes(e.key)).slice(0, STUDENT_POS.length).map((e, i) => ({ ...ficha(e, i + 3), ativo: e.ativo.split('/')[0], status: 'estudando' }));
@@ -806,11 +806,11 @@ const MOODS = ['perigo', 'alerta', 'normal', 'confiante'];
 const FOTOS = new Set(['teo', 'vera', 'rui', 'lena', 'nico', 'bia', 'rocha', 'sol', 'edu', 'dora', 'gui', 'ju', 'paulo', 'mari', 'caio', 'ana', 'leo']);
 function avatar(key, cor, nome) { if (FOTOS.has(key)) return `<span class="av" style="background:${cor} url(assets/rostos/${key}.jpg) center 20%/cover;box-shadow:0 0 0 2px ${cor}"></span>`; return `<span class="av" style="background:${cor}">${(nome || '?').split(' ').map(x => x[0]).join('')}</span>`; }
 function traderCard(tr) { return `<div class="ch">${avatar(tr.key, tr.cor, tr.nome)}<div><h3>${tr.nome}</h3><i>trader de ${tr.ativo}</i></div>${tr.situacao === 'na escola' ? '<span class="st">na escola</span>' : '<span class="ok">✓ na mesa</span>'}</div>
-  <p>${tr.situacao === 'na escola' ? 'Saiu da mesa e voltou a estudar. Só volta quando passar de novo na prova.' : tr.estrategia}${STATE.aoVivo ? '' : `<br>Prova na escola: fator de lucro <b>${tr.pf_escola.toFixed(2).replace('.', ',')}</b>`}</p>
+  ${tr.persona ? `<p>${tr.persona}</p>` : ''}<p>${tr.situacao === 'na escola' ? 'Saiu da mesa e voltou a estudar. Só volta quando passar de novo na prova.' : tr.estrategia}${STATE.aoVivo ? '' : `<br>Prova na escola: fator de lucro <b>${tr.pf_escola.toFixed(2).replace('.', ',')}</b>`}</p>
   <div class="mood">${MOODS.map(m => `<span class="${m === tr.humor ? 'on' : ''}">${m}</span>`).join('')}</div>
   <div class="kv"><div><small>hoje</small><b>${tr.vitorias}V · ${tr.derrotas}D</b></div><div><small>capital</small><b>$${tr.capital.toLocaleString('pt-BR')}</b></div><div><small>posição</small><b>${tr.posicao}</b></div></div>`; }
 function teamCard(p) { return `<div class="ch">${avatar(p.key, p.cor, p.nome)}<div><h3>${p.nome}</h3><i>${p.papel}</i></div></div><p>${p.fala}</p>`; }
-function studentCard(s) { return `<div class="ch">${avatar(s.key, s.cor, s.nome)}<div><h3>${s.nome}</h3><i>aluna(o) de ${s.ativo}</i></div><span class="st">na escola</span></div><p>Ainda não passou na prova. Precisa de fator de lucro 1,3 para ganhar uma mesa.</p>`; }
+function studentCard(s) { return `<div class="ch">${avatar(s.key, s.cor, s.nome)}<div><h3>${s.nome}</h3><i>aluna(o) de ${s.ativo}</i></div><span class="st">na escola</span></div>${s.persona ? `<p>${s.persona}</p>` : ''}<p>Ainda não passou na prova. Precisa de fator de lucro 1,3 no treino e confirmar na prova para ganhar uma mesa.</p>`; }
 function tab(name) {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === name)); idleT = 0;
   if (name === 'geral') { flyTo('geral'); hideCard(); }
@@ -887,6 +887,8 @@ const CAST = {
   ju: { file: F, hairs: [], longHair: 'medio', glasses: true, shirt: 0x1c1d22, pants: 0x1c1d22, inner: W_, vbot: .36, shoes: SH, hair: 0x3a2418, brow: 0x3a2418, skin: SKIN[1], height: 1.67, seed: 16, talky: true },
   paulo: { file: M, hairs: ['SimpleParted'], shirt: 0x7b7f87, pants: 0x7b7f87, inner: W_, tie: 0x2c4a86, shoes: 0x3a2416, hair: 0x2a1c14, skin: SKIN[1], height: 1.76, seed: 17 },
   davi: { file: M, hairs: ['Balding', 'Moustache'], glasses: true, shirt: 0x2d3340, pants: 0x2d3340, inner: W_, tie: 0x6b1f2a, shoes: SH, hair: 0x8a8a8a, skin: SKIN[0], height: 1.77, seed: 18 },
+  // Levy (dossiê de 26/11/2026): pesquisador, sério mas descontraído; óculos, barba curta, polo e tênis
+  levy: { file: M, hairs: ['SimpleParted', 'Beard'], glasses: true, shirt: 0x2f4a3a, pants: 0x2b3a55, shoes: 0xf2f2f2, hair: 0x2a1c14, skin: SKIN[2], height: 1.78, seed: 24 },
   ivo: { file: M, hairs: ['Buzzed'], shirt: 0x3b4a6b, pants: 0x1c1d22, shoes: 0xf2f2f2, hair: 0x2a1c14, skin: SKIN[3], height: 1.74, seed: 19 },
   rita: { file: F, hairs: ['Ponytail'], shirt: 0xf1f1ef, pants: 0x18181b, inner: 0xf1f1ef, tie: 0x141416, shoes: SH, hair: 0x2a1a12, brow: 0x2a1a12, skin: SKIN[2], height: 1.64, seed: 21 },
   pedro: { file: M, hairs: ['Buzzed', 'Beard'], shirt: 0x3c6e9a, pants: 0x2a2f45, long: false, shoes: 0xe9e9ee, hair: 0x1a1410, skin: SKIN[2], height: 1.79, seed: 22 },
@@ -915,7 +917,7 @@ async function main() {
   VAGA_POS.forEach(([x, z]) => labels.push(label3d('Vaga', 'para quem passar na escola', '#ffd25e', new THREE.Vector3(x, 1.7, z - 1))));
   STATE.equipe.forEach((m, i) => { const [x, z] = TEAM_POS[i]; desk(x, z + 1.0, Math.PI, { seed: 30 + i, col: '#c9a2ff', label: m.papel.split(' ')[0].toUpperCase() }); chairAt(x, z + .28, 0);
     const p = mk(m.key); seat(p, x, z + .28, 0); typeAt(p, x, .79, z + .7); p.userData.info = { kind: 'team', d: m }; clickables.push(p); labels.push(label3d(m.nome, m.papel, m.cor, new THREE.Vector3(x, 1.95, z))); });
-  STATE.escola.forEach((s, i) => { const [x, z] = STUDENT_POS[i]; chairAt(x, z + .1, Math.PI);
+  STATE.escola.forEach((s, i) => { if (!STUDENT_POS[i]) return; const [x, z] = STUDENT_POS[i]; chairAt(x, z + .1, Math.PI);
     const p = mk(s.key); seat(p, x, z + .1, Math.PI); typeAt(p, x, STUDENT_DESK_Y + .02, z - .3); p.userData.info = { kind: 'student', d: s }; clickables.push(p); labels.push(label3d(s.nome.split(' ')[0], s.ativo, s.cor, new THREE.Vector3(x, 1.8, z))); });
   // gente pelo escritório: bebedouro, impressora, lounge e sala de reunião
   const npc = (k, nome, papel, fala) => { const p = mk(k); p.userData.info = { kind: 'npc', key: k, nome, papel, fala }; clickables.push(p); return p; };
@@ -944,7 +946,7 @@ async function main() {
     let o = hit.object; while (o && !o.userData.info) o = o.parent; if (!o) return; const inf = o.userData.info; idleT = 0;
     if (inf.kind === 'trader') { showCard(traderCard(inf.d)); say(o, inf.d.fala); }
     if (inf.kind === 'team') { showCard(teamCard(inf.d)); say(o, inf.d.fala); }
-    if (inf.kind === 'student') { showCard(studentCard(inf.d)); say(o, 'Na próxima prova eu passo!'); }
+    if (inf.kind === 'student') { showCard(studentCard(inf.d)); say(o, inf.d.fala && inf.d.fala !== 'Foco no plano.' ? inf.d.fala : 'Na próxima prova eu passo!'); }
     if (inf.kind === 'cafe') { showCard(`<div class="ch">${avatar('caio', '#e8ecff', 'Caio')}<div><h3>Caio</h3><i>garçom da sala de operações</i></div></div><p>Pega o café na copa e serve cada trader na mesa, um por vez.</p>`); say(o, 'Café fresquinho!'); }
     if (inf.kind === 'npc') { showCard(`<div class="ch">${avatar(inf.key, '#cfd4ff', inf.nome)}<div><h3>${inf.nome}</h3><i>${inf.papel}</i></div></div><p>Faz parte da equipe que mantém a Trade City funcionando.</p>`); say(o, inf.fala); }
     if (inf.kind === 'cat') { showCard(`<div class="ch"><span class="av" style="background:#e3a868">B</span><div><h3>Bolota</h3><i>a gata da segurança</i></div></div><p>Faz a ronda do escritório e cochila no sofá do lounge.</p>`); say(o, 'Miau.'); } });
