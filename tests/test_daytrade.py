@@ -178,4 +178,4 @@ def test_desk_day_trade_flattens_before_close_and_groups():
 
     day = {t.key for t in _desk(":memory:", grupo="day").traders}
     swing = {t.key for t in _desk(":memory:", grupo="swing").traders}
-    assert day == set() and swing == {"rui", "teo", "lena", "davi", "sol", "dora", "bia"}  # Bia aprovada na escola de fluxo (28/11/2026)
+    assert day == {"mia"} and swing == {"rui", "teo", "lena", "davi", "sol", "dora", "bia"}  # Bia: fluxo; Mia: day trade com micro (28/11/2026)

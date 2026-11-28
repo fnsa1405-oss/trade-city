@@ -43,6 +43,13 @@ jobs:
             echo "nenhum cérebro treinado ainda"
           fi
 
+      - name: Carregar o histórico de 1 min do coletor
+        run: |
+          # as médias de 200 do 60 min pedem mais de 30 pregões de 1 min (o Yahoo só tem 30 dias)
+          if git fetch --depth=1 origin dados-intraday; then
+            git archive FETCH_HEAD dados | tar -x || echo "sem dados guardados"
+          fi
+
       - name: Abrir o livro de registros
         run: |
           WT="$RUNNER_TEMP/mesa-daytrade"
