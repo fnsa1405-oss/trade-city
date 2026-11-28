@@ -6,6 +6,7 @@
   python -m trade_city backtest lena --csv spy_diario.csv
   python -m trade_city rodar                            (um ciclo)
   python -m trade_city rodar --loop 60                  (a cada 60 s)
+  python -m trade_city rodar --loop 60 --minutos 55 --painel estado.json
   python -m trade_city placar
   python -m trade_city panico
   python -m trade_city destravar
@@ -216,6 +217,8 @@ def main(argv: list[str] | None = None) -> None:
     run.add_argument("--loop", type=int, default=0, help="segundos entre ciclos (0 = um ciclo só)")
     run.add_argument("--desde", help="HH:MM de Nova York: espera até esse horário para começar")
     run.add_argument("--ate", help="HH:MM de Nova York: para o loop nesse horário")
+    run.add_argument("--minutos", type=float, default=0, help="para o loop depois de tantos minutos (0 = sem limite)")
+    run.add_argument("--painel", help="grava o estado da mesa para o app neste arquivo a cada ciclo")
     run.add_argument("--trava-git", help='botão de pânico remoto, ex.: "controle:trava.txt" (conferido a cada ciclo)')
     pain = sub.add_parser("painel", help="grava o estado da mesa em JSON para o app")
     pain.add_argument("--mesa", default="swing", help="nome da mesa no app (swing ou day)")
@@ -361,16 +364,31 @@ def main(argv: list[str] | None = None) -> None:
         if args.desde:
             while ny_minutes() < hm(args.desde):
                 time.sleep(20)
+        inicio = time.monotonic()
+
+        def painel() -> None:
+            if args.painel:
+                from .painel import write_state
+
+                try:
+                    write_state(desk, args.grupo if args.grupo != "todos" else "swing", args.painel)
+                except Exception as exc:  # o app nunca derruba a mesa
+                    print(f"painel: {exc}", flush=True)
+
         while True:
             for event in desk.run_once():
                 print(event, flush=True)
+            painel()
             if not args.loop or (args.ate and ny_minutes() >= hm(args.ate)):
+                break
+            if args.minutos and time.monotonic() - inicio + args.loop > args.minutos * 60:
                 break
             time.sleep(args.loop)
             if _remote_lock(args.trava_git) is True and not desk.ledger.kill_switch:
-                print("botão de pânico do app acionado durante o pregão", flush=True)
+                print("botão de pânico do app acionado", flush=True)
                 for event in desk.panic():
                     print(event, flush=True)
+                painel()
 
 
 if __name__ == "__main__":

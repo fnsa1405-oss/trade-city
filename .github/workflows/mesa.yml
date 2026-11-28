@@ -1,14 +1,16 @@
 name: Mesa simulada
 
-# A mesa trabalha sozinha: a cada 30 minutos os traders aprovados na escola que não são de day trade
-# (hoje o Rui) analisam, passam pelo gestor de risco e pelo auditor e operam
+# A mesa trabalha sozinha, olhando o mercado A CADA MINUTO: os traders aprovados na escola que
+# não são de day trade (hoje o Rui) analisam, passam pelo gestor de risco e pelo auditor e operam
 # na corretora simulada, com preços reais e dinheiro de mentira.
+# O GitHub só agenda de hora em hora com segurança, então cada rodada é um turno de ~55 min
+# com um ciclo por minuto. Livro e estado do app são salvos a cada 2 minutos.
 # O livro de registros (trade_city.db) e o placar ficam salvos no branch "mesa-dados".
 # Para ver pelo celular: o app (pasta app/, publicado no GitHub Pages) lê o estado.json deste branch.
 # O botão de pânico do app grava o branch "controle"; a mesa confere antes de cada rodada.
 on:
   schedule:
-    - cron: "7,37 * * * *"
+    - cron: "2 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,7 +23,7 @@ concurrency:
 jobs:
   mesa:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -50,15 +52,30 @@ jobs:
             git worktree add --orphan -b mesa-dados "$WT"
           fi
 
-      - name: Rodar a mesa
+      - name: Rodar a mesa (um ciclo por minuto)
         run: |
-          python -m trade_city --db trade_city.db --grupo swing rodar --trava-git controle:trava.txt | tee rodada.txt
+          WT="$RUNNER_TEMP/mesa-dados"
+          MIN=${{ github.event_name == 'schedule' && 55 || 50 }}
+          python -m trade_city --db trade_city.db --grupo swing rodar --loop 60 --minutos "$MIN" \
+            --trava-git controle:trava.txt --painel estado.json > rodada.txt 2>&1 &
+          PID=$!
+          while kill -0 "$PID" 2>/dev/null; do
+            sleep 120
+            kill -0 "$PID" 2>/dev/null && bash .github/scripts/salvar-mesa.sh trade_city.db "$WT" "mesa: minuto a minuto" estado.json
+          done
+          STATUS=0; wait "$PID" || STATUS=$?
+          cat rodada.txt
+          exit $STATUS
+
+      - name: Placar
+        if: always()
+        run: |
           python -m trade_city --db trade_city.db --grupo swing placar > placar.txt
           python -m trade_city --db trade_city.db --grupo swing painel --mesa swing --saida estado.json
           {
             echo "## Rodada da mesa"
             echo '```'
-            cat rodada.txt
+            grep -v "^mesa rodando" rodada.txt || echo "sem novidades nesta rodada"
             echo '```'
             echo "## Placar"
             echo '```'
@@ -67,17 +84,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Salvar o livro no branch mesa-dados
+        if: always()
         run: |
-          WT="$RUNNER_TEMP/mesa-dados"
-          cp trade_city.db placar.txt estado.json "$WT/"
-          cd "$WT"
-          git config user.name "trade-city-mesa"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f trade_city.db placar.txt estado.json
-          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
-          git commit -q -m "mesa: rodada $(date -u +%Y-%m-%dT%H:%MZ)"
-          for i in 1 2 3 4; do
-            git push origin mesa-dados && exit 0
-            sleep $((i * 5))
-          done
-          exit 1
+          bash .github/scripts/salvar-mesa.sh trade_city.db "$RUNNER_TEMP/mesa-dados" "mesa: rodada" estado.json placar.txt

@@ -160,7 +160,7 @@ function desenhar() {
     ? ["erro", "sem sinal"]
     : presos
       ? ["travada", "travada"]
-      : idade < 50
+      : idade < 10
         ? ["vivo", "ao vivo"]
         : ["atraso", ultimaMesa ? "atrasada" : "aguardando"];
   status.dataset.estado = cod;
@@ -314,7 +314,7 @@ function itensOperacoes() {
 }
 
 const NOMES_ROBOS = {
-  "Mesa simulada": "Rodada da mesa",
+  "Mesa simulada": "Turno da mesa",
   "Mesa day trade": "Pregão de day trade",
   "Botão de pânico": "Botão de pânico",
   "Escola de traders": "Escola",
@@ -411,17 +411,20 @@ function desenharElenco() {
 }
 
 function proximaRodada() {
-  // a Mesa simulada roda aos 7 e aos 37 minutos de cada hora (o GitHub costuma atrasar alguns minutos)
+  // a mesa trabalha em turnos de ~55 min, olhando o mercado a cada minuto; um turno novo começa
+  // logo depois dos 2 minutos de cada hora (o GitHub às vezes atrasa alguns minutos)
+  const rodando = estado.rodadas.some((r) => r.nome === "Mesa simulada" && r.status !== "completed");
+  if (rodando) {
+    $("#proxima").textContent = "olhando o mercado a cada minuto";
+    return;
+  }
   const agora = new Date();
-  const m = agora.getUTCMinutes();
   const alvo = new Date(agora);
   alvo.setUTCSeconds(0, 0);
-  if (m < 7) alvo.setUTCMinutes(7);
-  else if (m < 37) alvo.setUTCMinutes(37);
-  else alvo.setUTCHours(alvo.getUTCHours() + 1, 7);
-  const rodando = estado.rodadas.some((r) => r.nome === "Mesa simulada" && r.status !== "completed");
+  if (agora.getUTCMinutes() >= 2) alvo.setUTCHours(alvo.getUTCHours() + 1);
+  alvo.setUTCMinutes(2);
   const min = Math.max(1, Math.round((alvo - agora) / 60000));
-  $("#proxima").textContent = rodando ? "rodada acontecendo agora" : `próxima rodada em ~${min} min`;
+  $("#proxima").textContent = `troca de turno, volta em ~${min} min`;
 }
 
 // ------------------------------------------------------------------ pânico
