@@ -51,9 +51,6 @@ MICROS: dict[str, Micro] = {
 }
 
 
-MICROS_BY_CODE: dict[str, Micro] = {m.code: m for m in MICROS.values()}
-
-
 def to_contract(bars: Sequence[Bar] | None, micro: Micro) -> list[Bar] | None:
     """Candles do ETF em dólares por contrato do micro futuro."""
     if bars is None:

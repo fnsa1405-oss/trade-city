@@ -1,8 +1,8 @@
 name: Mesa day trade
 
 # Day trade simulado no pregão de Nova York (9h30 às 16h), com os traders de day trade
-# aprovados na escola, sempre com microcontratos futuros (MNQ, MES, MYM, M2K). A mesa olha
-# o mercado a cada minuto e decide a cada candle fechado. Zera tudo antes do fechamento.
+# aprovados na escola (hoje Teo no QQQ e Lena no SPY). A mesa olha o mercado a cada
+# minuto e decide a cada candle de 5 minutos fechado. Zera tudo antes do fechamento.
 # Como um job do GitHub dura no máximo 6 horas, o pregão é dividido em duas rodadas:
 # até 12h45 e de 12h45 ao fechamento. Os horários abaixo estão em UTC e cobrem o
 # horário de verão e o de inverno de Nova York; rodadas repetidas esperam na fila.
@@ -43,11 +43,11 @@ jobs:
             echo "nenhum cérebro treinado ainda"
           fi
 
-      - name: Abrir os candles guardados pela coleta
-        # as médias longas do 60 min precisam de ~33 pregões de 1 min; o Yahoo só tem ~20
+      - name: Carregar o histórico de 1 min do coletor
         run: |
+          # as médias de 200 do 60 min pedem mais de 30 pregões de 1 min (o Yahoo só tem 30 dias)
           if git fetch --depth=1 origin dados-intraday; then
-            git archive FETCH_HEAD dados | tar -x || echo "sem candles guardados"
+            git archive FETCH_HEAD dados | tar -x || echo "sem dados guardados"
           fi
 
       - name: Abrir o livro de registros

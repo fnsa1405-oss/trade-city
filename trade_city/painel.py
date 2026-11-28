@@ -38,7 +38,7 @@ def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int =
             {
                 "key": t.key,
                 "nome": t.name,
-                "ativo": t.ticker,
+                "ativo": t.symbol,
                 "classe": t.asset_class.value,
                 "tempo": t.timeframe,
                 "estrategia": t.strategy.name,
@@ -125,7 +125,7 @@ def build_state(desk: Desk, mesa: str, now: datetime | None = None, n_ops: int =
         {
             "key": t.key,
             "nome": t.name,
-            "ativo": t.ticker,
+            "ativo": t.symbol,
             "situacao": "na mesa" if t.key in ativos else "na escola",
         }
         for t in default_traders()

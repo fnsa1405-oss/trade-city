@@ -158,23 +158,26 @@ class Clock:
         return self.now
 
 
-def test_paper_broker_micro_uses_margin_tick_and_fee():
-    feed = Feed(44_000.0)
-    b = PaperBroker(sqlite3.connect(":memory:"), feed=feed, initial_cash=10_000, clock=Clock(T0))
-    sig = Signal("davi", "MYM", 44_000.0, "teste", T0)
-    fill = b.submit_entry(TradePlan(sig, 1.0, 43_900.0, 44_200.0, 100.0, "normal"), AssetClass.EQUITY)
-    assert fill.price == pytest.approx(44_000.5)  # 1 tick do MYM = US$0,50
-    assert b.buying_power() == pytest.approx(10_000 - 1_000 - 0.85)
-    feed.price = 43_950.0
-    add = b.add_to_position("MYM", 1.0)
-    assert add.price == pytest.approx(43_950.5)
-    pos = b.get_position("MYM")
-    assert pos.qty == 2 and pos.avg_entry_price == pytest.approx(43_975.5)
-    feed.price = 44_100.0
-    out = b.close_position("MYM")
-    assert out.price == pytest.approx(44_099.5)
-    gain = (44_099.5 - 43_975.5) * 2 - 4 * 0.85
-    assert b.buying_power() == pytest.approx(10_000 + gain)
+def test_paper_broker_adds_to_micro_position_with_margin_and_costs():
+    from trade_city.futures import MICROS
+
+    feed = Feed(440.0)  # DIA a 440 = MYM a 22.000 (US$0,50 por ponto)
+    b = PaperBroker(sqlite3.connect(":memory:"), feed=feed, initial_cash=10_000, clock=Clock(T0), contracts={"DIA": MICROS["DIA"]})
+    sig = Signal("mia", "DIA", 22_000.0, "teste", T0)
+    fill = b.submit_entry(TradePlan(sig, 1.0, 21_900.0, 22_200.0, 50.0, "normal"), AssetClass.EQUITY)
+    cost = 0.5 + 0.85  # 1 tick + corretagem, por contrato e por lado
+    assert fill.price == pytest.approx(22_000 + cost)
+    assert b.buying_power() == pytest.approx(9_000)
+    feed.price = 441.0
+    add = b.add_to_position("DIA", 1.0)
+    assert add.price == pytest.approx(22_050 + cost)
+    assert b.buying_power() == pytest.approx(8_000)
+    pos = b.get_position("DIA")
+    assert pos.qty == 2 and pos.avg_entry_price == pytest.approx(22_025 + cost)
+    b.set_stops("DIA", 22_010.0, 22_300.0)
+    feed.price = 440.0  # 22.000: abaixo do novo stop, a corretora zera as duas pernas
+    assert b.get_position("DIA") is None
+    assert b.last_exit_price("DIA") == pytest.approx(22_000 - cost)
 
 
 def test_desk_averages_down_on_micro_and_keeps_one_stop():
@@ -212,27 +215,3 @@ def test_desk_averages_down_on_micro_and_keeps_one_stop():
     desk.run_once()
     assert ledger.open_trade_for("rui") is None
     assert -300 < sum(ledger.closed_pnls("rui")) < -150
-
-
-def test_desk_trades_micro_contracts_with_margin_and_fees():
-    from conftest import make_bars
-
-    from trade_city.strategies import TrendFollower
-
-    ledger = Ledger(":memory:")
-    feed = Feed(30_000.0 * 1.01**39)
-    feed.bars = make_bars([30_000 * 1.01**i for i in range(40)])
-    clock = Clock(datetime(2026, 11, 25, 15, 0, tzinfo=timezone.utc))  # 10h em Nova York
-    broker = PaperBroker(ledger.conn, feed=feed, initial_cash=200_000, clock=clock)
-    t = TraderProfile("duda", "Duda", "teste", "DIA", AssetClass.EQUITY, "1h", TrendFollower(5, 10, 5), capital=200_000, contract="MYM")
-    desk = Desk([t], broker, ledger, RiskConfig(), clock=clock)
-    events = desk.run_once()
-    assert any("MYM" in e and "comprou" in e for e in events), events
-    trade = ledger.open_trade_for("duda")
-    assert trade.symbol == "MYM" and trade.qty == int(trade.qty) >= 1
-    assert broker.buying_power() == pytest.approx(200_000 - trade.qty * (1_000 + 0.85))
-    feed.price = trade.entry_price + 0.5  # sai no mesmo preço (o tick de saída come o meio tick)
-    clock.now += timedelta(minutes=1)
-    out = desk.panic()
-    pnl = ledger.closed_pnls("duda")[0]
-    assert pnl == pytest.approx(-2 * 0.85 * trade.qty, abs=0.01), out

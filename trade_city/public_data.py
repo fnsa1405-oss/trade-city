@@ -79,11 +79,6 @@ def yahoo_latest(symbol: str) -> float:
 
 
 def latest_price(symbol: str, asset_class: AssetClass) -> float:
-    from .futures import MICROS_BY_CODE
-
-    micro = MICROS_BY_CODE.get(symbol)
-    if micro is not None:
-        return latest_price(micro.etf, asset_class) * micro.scale
     if asset_class is AssetClass.CRYPTO:
         return coinbase_latest(symbol)
     return yahoo_latest(symbol)
@@ -180,11 +175,6 @@ def massive_bars(symbol: str, timeframe: str, days: int, api_key: str, fetch=_ht
 
 
 def public_bars(symbol: str, asset_class: AssetClass, timeframe: str, days: int) -> list[Bar]:
-    from .futures import MICROS_BY_CODE, to_contract
-
-    micro = MICROS_BY_CODE.get(symbol)
-    if micro is not None:  # micro futuro: candles do ETF em dólares por contrato
-        return to_contract(public_bars(micro.etf, asset_class, timeframe, days), micro)
     if asset_class is AssetClass.CRYPTO:
         if timeframe == "4h":  # a Coinbase não tem 4h: junta candles de 1h
             from .data import resample

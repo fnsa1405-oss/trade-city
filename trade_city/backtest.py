@@ -335,6 +335,7 @@ def run_backtest(
             has_open_position=False,
             buying_power=stats.capital,
             unit_margin=unit_margin,
+            asset_class=trader.asset_class,
         )
         audit = auditor.review(plan, ctx)
         if audit.approved:

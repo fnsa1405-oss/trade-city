@@ -90,7 +90,15 @@ def _desk(db: str, corretora: str = "simulada", grupo: str = "todos"):
     else:
         from .broker.paper import PaperBroker
 
-        broker = PaperBroker(ledger.conn, initial_cash=sum(t.capital for t in approved))
+        import os
+
+        from .broker.paper import PublicFeed
+        from .futures import MICROS
+
+        # day trade nos índices: microcontratos futuros (MNQ, MES, MYM, M2K)
+        contracts = {t.symbol: MICROS[t.symbol] for t in approved if t.micro and t.symbol in MICROS}
+        feed = PublicFeed(dados="dados" if os.path.isdir("dados") else None)
+        broker = PaperBroker(ledger.conn, feed=feed, initial_cash=sum(t.capital for t in approved), contracts=contracts)
     return Desk(approved, broker, ledger, brains=brains)
 
 
@@ -165,6 +173,35 @@ def _train_brains(traders, dados: str, folder: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _flow_school(trader, args) -> str:
+    """Escola de fluxo de ordens de um trader (ver school_flow.py)."""
+    from .models import AssetClass
+    from .orderflow import binance_symbol, flow_series
+    from .school import report_markdown
+    from .school_flow import evaluate_flow, ranking_markdown
+
+    if trader.asset_class is AssetClass.CRYPTO:
+        series = flow_series(binance_symbol(trader.symbol), args.fluxo)
+        if not series:
+            return f"### {trader.name} ({trader.symbol})\n\nSem histórico de fluxo (rode fluxo-historico).\n"
+        results = evaluate_flow(trader, series)
+        note = "Fluxo real da Binance: " + "; ".join(f"{tf} {len(b)} candles desde {b[0].ts:%m/%Y}" for tf, b in series.items() if b) + ". Custo: 0,1% de taxa + 0,05% de derrapagem por lado.\n"
+        check = ""
+        if trader.approved:
+            from .school import current_check
+
+            check = current_check(trader, series)
+        return report_markdown(trader, results) + ranking_markdown(results) + check + note
+    from .history import DAY_TIMEFRAMES, intraday_history
+    from .school import with_15min
+
+    series = {tf: intraday_history(trader.symbol, tf, args.dados) for tf in DAY_TIMEFRAMES}
+    note = _history_note(series) + "Delta ESTIMADO pelos candles (classificação de volume em bloco); microcontratos com corretagem e 1 tick de derrapagem.\n"
+    series = with_15min(series)
+    results = evaluate_flow(trader, series, day=True, fine=series.get("1min"))
+    return report_markdown(trader, results) + ranking_markdown(results) + note
+
+
 def _history_note(series) -> str:
     from .intraday import NY
 
@@ -192,7 +229,6 @@ def _school_scaling(trader, args) -> str:
         asset_class=AssetClass.CRYPTO if crypto else AssetClass.EQUITY,
         day_trade=True,
         approved=False,
-        contract=None,
         scaling=None,
     )
     if crypto:
@@ -269,10 +305,11 @@ def main(argv: list[str] | None = None) -> None:
     esc.add_argument("trader", nargs="?", default="todos")
     esc.add_argument(
         "--modo",
-        choices=["normal", "swing", "scalp", "escala"],
+        choices=["normal", "swing", "scalp", "fluxo", "escala"],
         default="normal",
-        help="swing = índices em swing (60 min e diário); scalp = criptos em 1 e 5 min; escala = day trade com preço médio e pirâmide",
+        help="swing = índices em swing (60 min e diário); scalp = criptos em 1 e 5 min; fluxo = estratégias de fluxo de ordens; escala = day trade com preço médio e pirâmide",
     )
+    esc.add_argument("--fluxo", default="fluxo", help="pasta com o histórico de fluxo das criptos (fluxo-historico)")
     esc.add_argument("--ativo", help="modo escala: testa este ativo (ex.: DIA, QQQ, BTC/USD) no lugar do ativo do trader")
     esc.add_argument("--dias", type=int, default=1095, help="dias de histórico para cripto e para o diário de ações")
     esc.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
@@ -281,6 +318,17 @@ def main(argv: list[str] | None = None) -> None:
     cer.add_argument("--dados", default="dados")
     cer.add_argument("--pasta", default="cerebros")
     cer.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
+    flh = sub.add_parser("fluxo-historico", help="baixa/atualiza o histórico de fluxo das criptos (Binance, grátis)")
+    flh.add_argument("--pasta", default="fluxo")
+    flh.add_argument("--desde", default="2017-01-01")
+    liv = sub.add_parser("coletar-livro", help="fotografa o livro de ofertas e os negócios das criptos ao vivo")
+    liv.add_argument("--pasta", default="livro")
+    liv.add_argument("--minutos", type=float, default=340)
+    liv.add_argument("--intervalo", type=float, default=15, help="segundos entre fotos")
+    car = sub.add_parser("carteira", help="divide o risco entre os aprovados e calibra o risco por operação")
+    car.add_argument("--dias", type=int, default=2900)
+    car.add_argument("--saida", help="salva o relatório em Markdown neste arquivo")
+    car.add_argument("--json", help="salva a alocação recomendada neste arquivo")
     col = sub.add_parser("coletar", help="guarda os candles de 5 e 1 min dos traders de day trade e do Ibovespa (B3)")
     col.add_argument("--dados", default="dados")
     run = sub.add_parser("rodar", help="roda a mesa (corretora simulada por padrão)")
@@ -342,6 +390,11 @@ def main(argv: list[str] | None = None) -> None:
                     print(section, flush=True)
                     parts.append(section)
                     continue
+                if args.modo == "fluxo":
+                    section = _flow_school(trader, args)
+                    print(section, flush=True)
+                    parts.append(section)
+                    continue
                 if trader.asset_class is AssetClass.CRYPTO and args.modo == "scalp":
                     from .school import SCALP_RISK_VARIANTS, SCALP_SETUPS
 
@@ -383,7 +436,9 @@ def main(argv: list[str] | None = None) -> None:
                         "1h": public_bars(trader.symbol, trader.asset_class, "1h", 729),
                     }
                 section = report_markdown(trader, evaluate(trader, series, fine=series.get("1min"))) + note
-                if trader.approved:
+                if trader.approved and getattr(trader.strategy, "uses_flow", False):
+                    section += "Estratégia atual é de fluxo de ordens: conferida na Escola de fluxo (dados da Binance).\n"
+                elif trader.approved:
                     section += current_check(trader, series, fine=series.get("1min"))
             except Exception as exc:  # um ativo com problema não derruba os outros
                 section = f"### {trader.name} ({trader.symbol})\n\nErro ao testar: {exc}\n"
@@ -392,6 +447,41 @@ def main(argv: list[str] | None = None) -> None:
         if args.saida:
             with open(args.saida, "w") as fh:
                 fh.write("\n".join(parts))
+        return
+
+    if args.cmd == "fluxo-historico":
+        from datetime import date
+
+        from .orderflow import binance_symbol, update_history
+        from .models import AssetClass
+
+        since = date.fromisoformat(args.desde)
+        for t in default_traders():
+            if t.asset_class is AssetClass.CRYPTO:
+                update_history(binance_symbol(t.symbol), args.pasta, since)
+        return
+
+    if args.cmd == "coletar-livro":
+        from .book_collector import run_collector
+        from .models import AssetClass
+
+        pairs = sorted({t.symbol for t in default_traders() if t.asset_class is AssetClass.CRYPTO})
+        run_collector(pairs, args.pasta, args.minutos, args.intervalo)
+        return
+
+    if args.cmd == "carteira":
+        from .carteira import portfolio_report
+
+        text, alloc = portfolio_report(default_traders(), args.dias)
+        print(text)
+        if args.saida:
+            with open(args.saida, "w") as fh:
+                fh.write(text)
+        if args.json:
+            import json
+
+            with open(args.json, "w") as fh:
+                json.dump(alloc, fh, indent=2, ensure_ascii=False)
         return
 
     if args.cmd == "cerebros":
