@@ -1,7 +1,7 @@
 {
  "versao": 1,
  "mesa": "swing",
- "gerado_em": "2026-11-28T11:07:57+00:00",
+ "gerado_em": "2026-11-28T11:09:36+00:00",
  "modo": "simulado",
  "travada": false,
  "travas": {
@@ -184,6 +184,7 @@
    "posicao": null
   }
  ],
+ "dias": [],
  "operacoes": [],
  "eventos": [],
  "elenco": [
@@ -234,6 +235,18 @@
    "nome": "Davi Dow",
    "ativo": "DIA",
    "situacao": "na mesa"
+  },
+  {
+   "key": "mia",
+   "nome": "Mia Média",
+   "ativo": "DIA",
+   "situacao": "na escola"
+  },
+  {
+   "key": "flora",
+   "nome": "Flora Fluxo",
+   "ativo": "SPY",
+   "situacao": "na escola"
   },
   {
    "key": "ivo",
