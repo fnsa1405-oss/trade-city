@@ -259,7 +259,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd == "escola":
         from .models import AssetClass
         from .public_data import public_bars
-        from .school import evaluate, report_markdown, timeframes_for, with_15min
+        from .school import current_check, evaluate, report_markdown, timeframes_for, with_15min
 
         traders = default_traders() if args.trader == "todos" else [_trader(args.trader)]
         parts = ["## Escola de traders", "", "Estratégia escolhida no treino (70% iniciais do histórico) e conferida na prova (30% finais).", ""]
@@ -308,6 +308,8 @@ def main(argv: list[str] | None = None) -> None:
                         "1h": public_bars(trader.symbol, trader.asset_class, "1h", 729),
                     }
                 section = report_markdown(trader, evaluate(trader, series, fine=series.get("1min"))) + note
+                if trader.approved:
+                    section += current_check(trader, series, fine=series.get("1min"))
             except Exception as exc:  # um ativo com problema não derruba os outros
                 section = f"### {trader.name} ({trader.symbol})\n\nErro ao testar: {exc}\n"
             print(section, flush=True)

@@ -49,3 +49,15 @@ def test_no_target_variant_only_for_strategies_with_exit():
     turtle = [c for c in CANDIDATES if c.label.startswith("Turtle")][:1]
     assert evaluate(bia, {"1h": bars}, candidates=trend, risks=no_target) == []
     assert len(evaluate(bia, {"1h": bars}, candidates=turtle, risks=no_target)) == 1
+
+
+def test_current_check_reports_the_live_strategy():
+    from trade_city.config import default_traders
+    from trade_city.school import current_check
+    from conftest import make_bars
+    import math
+
+    rui = next(t for t in default_traders() if t.key == "rui")
+    bars = make_bars([100 + 10 * math.sin(k / 15) + k * 0.05 for k in range(1500)])
+    text = current_check(rui, {rui.timeframe: bars})
+    assert "Estratégia atual" in text and ("continua aprovada" in text or "não passa mais" in text)

@@ -333,3 +333,28 @@ def report_markdown(trader: TraderProfile, results: Sequence[Result], rules: Sch
         )
     lines.append("")
     return "\n".join(lines)
+
+
+def current_check(trader: TraderProfile, series: dict[str, list[Bar]], rules: SchoolRules = SchoolRules(), fine=None) -> str:
+    """Confere a estratégia que o trader usa hoje nos mesmos dados (treino e prova), sem
+    escolher nada: serve para ver se uma aprovação antiga continua de pé."""
+    import copy
+
+    bars = series.get(trader.timeframe)
+    if not bars:
+        return ""
+    base = RiskConfig()
+    rv = RiskVariant("atual", trader.atr_stop_multiple or base.atr_stop_multiple, trader.reward_ratio or base.reward_ratio)
+    cand = Candidate(trader.strategy.name, lambda: copy.deepcopy(trader.strategy))
+    res = evaluate(trader, {trader.timeframe: bars}, rules, candidates=[cand], risks=[rv], fine=fine)
+    if not res:
+        return ""
+    r = res[0]
+    ok = r.train_ok(rules) and r.test_ok(rules)
+    verdict = "continua aprovada" if ok else "não passa mais"
+    return (
+        f"Estratégia atual ({trader.strategy.name}, {trader.timeframe}): **{verdict}**. "
+        f"Treino: {len(r.train.trades)} operações, fator de lucro {_pf(r.train.profit_factor)}; "
+        f"prova: {len(r.test.trades)} operações, fator de lucro {_pf(r.test.profit_factor)}, "
+        f"{r.test.total_pnl / r.test.base_capital:+.1%}.\n"
+    )
