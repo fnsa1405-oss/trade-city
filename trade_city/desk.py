@@ -90,7 +90,10 @@ class Desk:
                 price = fill.price
             else:
                 price = self.broker.last_exit_price(trader.ticker) or trade.entry_price
-            pnl = self.ledger.close_trade(trade.id, price, self.clock(), "pânico")
+            micro = _micro(trader)
+            fees = 2 * micro.fee * trade.qty if micro else 0.0
+            pnl = self.ledger.close_trade(trade.id, price, self.clock(), "pânico", fees)
+            self.ledger.set_flag(f"legs:{trader.key}", "")
             events.append(f"[{trader.name}] posição zerada, resultado {pnl:+.2f}")
         return events
 

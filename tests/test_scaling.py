@@ -212,3 +212,27 @@ def test_desk_averages_down_on_micro_and_keeps_one_stop():
     desk.run_once()
     assert ledger.open_trade_for("rui") is None
     assert -300 < sum(ledger.closed_pnls("rui")) < -150
+
+
+def test_desk_trades_micro_contracts_with_margin_and_fees():
+    from conftest import make_bars
+
+    from trade_city.strategies import TrendFollower
+
+    ledger = Ledger(":memory:")
+    feed = Feed(30_000.0 * 1.01**39)
+    feed.bars = make_bars([30_000 * 1.01**i for i in range(40)])
+    clock = Clock(datetime(2026, 11, 25, 15, 0, tzinfo=timezone.utc))  # 10h em Nova York
+    broker = PaperBroker(ledger.conn, feed=feed, initial_cash=200_000, clock=clock)
+    t = TraderProfile("duda", "Duda", "teste", "DIA", AssetClass.EQUITY, "1h", TrendFollower(5, 10, 5), capital=200_000, contract="MYM")
+    desk = Desk([t], broker, ledger, RiskConfig(), clock=clock)
+    events = desk.run_once()
+    assert any("MYM" in e and "comprou" in e for e in events), events
+    trade = ledger.open_trade_for("duda")
+    assert trade.symbol == "MYM" and trade.qty == int(trade.qty) >= 1
+    assert broker.buying_power() == pytest.approx(200_000 - trade.qty * (1_000 + 0.85))
+    feed.price = trade.entry_price + 0.5  # sai no mesmo preço (o tick de saída come o meio tick)
+    clock.now += timedelta(minutes=1)
+    out = desk.panic()
+    pnl = ledger.closed_pnls("duda")[0]
+    assert pnl == pytest.approx(-2 * 0.85 * trade.qty, abs=0.01), out

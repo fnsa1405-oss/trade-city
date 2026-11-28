@@ -36,12 +36,44 @@ CREATE TABLE IF NOT EXISTS paper_orders (id INTEGER PRIMARY KEY, ts TEXT NOT NUL
 
 
 class PublicFeed:
-    """Preços das fontes públicas (Coinbase e Yahoo Finance)."""
+    """Preços das fontes públicas (Coinbase e Yahoo Finance).
+
+    Day trade com médias longas (MMA200 de 60 min = ~33 pregões) precisa de mais candles de
+    1 min do que o Yahoo guarda (~20 pregões). Se a pasta `dados` do coletor existir, os
+    candles guardados entram por baixo dos baixados agora (lidos uma vez só)."""
+
+    def __init__(self, dados: str = "dados"):
+        self.dados = dados
+        self._stored: dict[tuple[str, str], list[Bar]] = {}
+
+    def _stored_bars(self, etf: str, timeframe: str) -> list[Bar]:
+        import os
+
+        from ..data import load_csv
+        from ..history import csv_path
+
+        key = (etf, timeframe)
+        if key not in self._stored:
+            path = csv_path(self.dados, etf, timeframe)
+            self._stored[key] = load_csv(path) if os.path.exists(path) else []
+        return self._stored[key]
 
     def get_bars(self, symbol: str, asset_class: AssetClass, timeframe: str, days: int) -> list[Bar]:
+        from ..futures import MICROS_BY_CODE, to_contract
         from ..public_data import public_bars
 
-        return public_bars(symbol, asset_class, timeframe, days)
+        fresh = public_bars(symbol, asset_class, timeframe, days)
+        if asset_class is AssetClass.CRYPTO or timeframe not in ("1min", "5min"):
+            return fresh
+        micro = MICROS_BY_CODE.get(symbol)
+        stored = self._stored_bars(micro.etf if micro else symbol, timeframe)
+        if not stored:
+            return fresh
+        first = fresh[0].ts if fresh else None
+        older = [b for b in stored[-60 * 390 :] if first is None or b.ts < first][-40 * 390 :]
+        if micro is not None:
+            older = to_contract(older, micro)
+        return older + fresh
 
     def latest_price(self, symbol: str, asset_class: AssetClass) -> float:
         from ..public_data import latest_price

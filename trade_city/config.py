@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 
 from .models import AssetClass
 from .scaling import Scaling
-from .strategies import DonchianEnsemble, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
+from .strategies import DonchianEnsemble, MovingAverageTrend, OpeningRangeDayTrade, Strategy, TimeSeriesMomentum, TrendFollower, TurtleBreakout
 
 
 @dataclass(frozen=True)
@@ -167,6 +167,23 @@ def default_traders() -> list[TraderProfile]:
             approved=True,
             atr_stop_multiple=2.0,
             reward_ratio=50.0,  # sem alvo: sai na perda da mínima de 10 dias
+        ),
+        TraderProfile(
+            key="duda",
+            name="Duda Micro",
+            persona="Rápida no gatilho: faz day trade no micro Dow (MYM) só a favor das médias.",
+            symbol="DIA",
+            contract="MYM",
+            asset_class=AssetClass.EQUITY,
+            timeframe="1min",
+            strategy=MovingAverageTrend("forca", (60, 15, 5)),
+            data_lookback_days=7,  # o resto vem dos candles guardados pela coleta
+            # escola 28/11/2026 (2 anos de 1 min, micro MYM com custos): médias empilhadas em
+            # 60/15/5 min + candle de força no 2 min, prova com 27 operações e fator de lucro 1,34
+            approved=True,
+            atr_stop_multiple=2.0,
+            reward_ratio=50.0,  # sem alvo: sai quando o 2 min perde a MMA20 ou no fim do dia
+            day_trade=True,
         ),
         TraderProfile(
             key="ivo",
