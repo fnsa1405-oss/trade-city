@@ -1,0 +1,35 @@
+name: Carteira
+
+# Gestão de carteira: correlação entre os traders aprovados, peso de cada um (paridade de
+# risco) e calibração do risco por operação (backtest com todas as travas, treino e prova).
+on:
+  pull_request:
+    paths:
+      - "trade_city/carteira.py"
+      - ".github/workflows/carteira.yml"
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: "Dias de histórico das criptos"
+        type: number
+        default: 2900
+
+permissions:
+  contents: read
+
+jobs:
+  carteira:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Calcular a carteira
+        run: |
+          python -m trade_city carteira --dias "${{ inputs.dias || 2900 }}" --saida carteira.md --json carteira.json
+          cat carteira.md >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat carteira.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"

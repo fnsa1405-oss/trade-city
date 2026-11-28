@@ -1,0 +1,88 @@
+name: Escola de fluxo
+
+# Fluxo de ordens: baixa (e completa) o histórico gratuito de agressão, livro e contratos em
+# aberto das criptos nos arquivos públicos da Binance, guarda no branch "dados-fluxo" e testa
+# as estratégias de fluxo na escola, com as mesmas regras e custos de sempre.
+# Índices: day trade com microcontratos e delta estimado pelos candles de 1 e 5 min.
+on:
+  pull_request:
+    paths:
+      - "trade_city/orderflow.py"
+      - "trade_city/school_flow.py"
+      - "trade_city/strategies/orderflow.py"
+      - ".github/workflows/fluxo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fluxo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  historico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Abrir o histórico guardado
+        run: |
+          WT="$RUNNER_TEMP/dados-fluxo"
+          if git fetch --depth=1 origin dados-fluxo; then
+            git worktree add -B dados-fluxo "$WT" FETCH_HEAD
+          else
+            git worktree add --orphan -b dados-fluxo "$WT"
+          fi
+          mkdir -p "$WT/fluxo"
+      - name: Baixar e completar (Binance, grátis)
+        run: python -m trade_city fluxo-historico --pasta "$RUNNER_TEMP/dados-fluxo/fluxo" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Salvar no branch dados-fluxo
+        run: |
+          cd "$RUNNER_TEMP/dados-fluxo"
+          git config user.name "trade-city-fluxo"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f fluxo
+          if git diff --cached --quiet; then echo "nada novo"; exit 0; fi
+          git commit -q -m "fluxo: $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do
+            git pull -q --rebase origin dados-fluxo 2>/dev/null || true
+            git push origin HEAD:dados-fluxo && exit 0
+            sleep $((i * 5))
+          done
+          exit 1
+
+  escola:
+    needs: historico
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        trader: [bia, edu, sol, rui, dora, teo, lena, davi, ivo]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Abrir os dados
+        run: |
+          git fetch --depth=1 origin dados-fluxo && git worktree add -B dados-fluxo "$RUNNER_TEMP/dados-fluxo" FETCH_HEAD
+          ln -s "$RUNNER_TEMP/dados-fluxo/fluxo" fluxo
+          if git fetch --depth=1 origin dados-intraday; then
+            git worktree add -B dados-intraday "$RUNNER_TEMP/dados-intraday" FETCH_HEAD
+            ln -s "$RUNNER_TEMP/dados-intraday/dados" dados
+          fi
+      - name: Escola de fluxo
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+        run: |
+          python -m trade_city escola ${{ matrix.trader }} --modo fluxo --saida fluxo-${{ matrix.trader }}.md
+          cat fluxo-${{ matrix.trader }}.md >> "$GITHUB_STEP_SUMMARY"

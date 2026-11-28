@@ -19,6 +19,11 @@ class AuditContext:
     kill_switch: bool = False
     market_open: bool = True
     unit_margin: float | None = None  # micro futuros: margem por contrato (no lugar do valor cheio)
+    # carteira: capital total da mesa e risco já aberto (somado e no grupo do trader).
+    # portfolio_capital = 0 desliga a checagem (backtest de um trader só)
+    portfolio_capital: float = 0.0
+    portfolio_open_risk: float = 0.0
+    group_open_risk: float = 0.0
 
 
 class Auditor:
@@ -57,6 +62,18 @@ class Auditor:
             reasons.append("poder de compra insuficiente")
         if exposure > ctx.capital + 1e-6:
             reasons.append("posição maior que o capital do trader")
+
+        if ctx.portfolio_capital > 0:
+            total = ctx.portfolio_open_risk + plan.risk_amount
+            if total > cfg.max_portfolio_risk * ctx.portfolio_capital * 1.01:
+                reasons.append(
+                    f"risco aberto da carteira iria a {total / ctx.portfolio_capital:.2%}, limite {cfg.max_portfolio_risk:.1%}"
+                )
+            group = ctx.group_open_risk + plan.risk_amount
+            if group > cfg.max_cluster_risk * ctx.portfolio_capital * 1.01:
+                reasons.append(
+                    f"risco aberto do grupo correlacionado iria a {group / ctx.portfolio_capital:.2%}, limite {cfg.max_cluster_risk:.1%}"
+                )
 
         if ctx.day_losses >= cfg.max_daily_losses:
             reasons.append(f"{ctx.day_losses} derrotas hoje: trader parado até amanhã")

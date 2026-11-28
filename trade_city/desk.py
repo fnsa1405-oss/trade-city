@@ -173,6 +173,7 @@ class Desk:
             buying_power=self.broker.buying_power(),
             kill_switch=self.ledger.kill_switch,
             market_open=self.broker.is_market_open(trader.asset_class),
+            **self._portfolio_risk(trader),
         )
         audit = Auditor(risk).review(plan, ctx)
         self.ledger.record_decision(
@@ -193,6 +194,20 @@ class Desk:
             f"[{trader.name}] {verb} {qty:g} {trader.symbol} a {fill.price:.2f} ({mode}), "
             f"stop {plan.stop_loss:.2f}, alvo {plan.take_profit:.2f}"
         ]
+
+    def _portfolio_risk(self, trader: TraderProfile) -> dict:
+        """Risco aberto (até o stop) de toda a mesa e do grupo correlacionado do trader."""
+        total = group = 0.0
+        for other in self.traders:
+            trade = self.ledger.open_trade_for(other.key)
+            if trade is None:
+                continue
+            risk = abs(trade.entry_price - trade.stop_loss) * trade.qty
+            total += risk
+            if trader.group and other.group == trader.group:
+                group += risk
+        capital = sum(t.capital for t in self.traders)
+        return {"portfolio_capital": capital, "portfolio_open_risk": total, "group_open_risk": group}
 
     def _manage(self, trader: TraderProfile, trade: OpenTrade, bars) -> list[str]:
         """5. Placar: acompanha a posição aberta e registra o resultado quando ela fecha."""

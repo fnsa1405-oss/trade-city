@@ -20,6 +20,10 @@ class RiskConfig:
     max_daily_losses: int = 5
     max_daily_loss_pct: float = 0.03
     max_drawdown_pct: float = 0.10  # queda desde o pico que manda o trader de volta à escola
+    # carteira (carteira.py): risco aberto somado de todos os traders e de cada grupo
+    # correlacionado, em fração do capital total da mesa
+    max_portfolio_risk: float = 0.03
+    max_cluster_risk: float = 0.015
     daily_win_goal: int = 10
     profit_milestone: float = 100.0  # a cada marco de lucro (USD), um novo aprendiz é liberado
     timezone: str = "America/Sao_Paulo"  # define o "dia" do placar
@@ -40,11 +44,17 @@ class TraderProfile:
     atr_stop_multiple: float | None = None  # ajuste de stop aprovado na escola (None = padrão)
     reward_ratio: float | None = None  # ajuste de alvo aprovado na escola (None = padrão)
     day_trade: bool = False  # True = a escola testa só day trade (gatilho de 5 ou 1 min)
+    # carteira (carteira.py): peso de risco por paridade de risco (multiplica o risco por
+    # operação) e grupo de ativos correlacionados (limite de risco aberto por grupo)
+    risk_weight: float = 1.0
+    group: str = ""
 
 
 def risk_for(trader: TraderProfile, base: RiskConfig) -> RiskConfig:
     """Travas da mesa com o ajuste de stop/alvo que o trader aprovou na escola."""
     changes = {}
+    if trader.risk_weight != 1.0:
+        changes["risk_per_trade"] = base.risk_per_trade * trader.risk_weight
     if trader.atr_stop_multiple is not None:
         changes["atr_stop_multiple"] = trader.atr_stop_multiple
     if trader.reward_ratio is not None:
