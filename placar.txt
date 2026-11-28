@@ -1,6 +1,41 @@
 Trade City (paper)
 
+Sol Ventura  (SOL/USD, Momento de série temporal (28 candles))
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
 Rui Xis  (XRP/USD, Donchian em conjunto (Zarattini/Pagani/Barbon))
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
+Dora Doge  (DOGE/USD, Donchian em conjunto (Zarattini/Pagani/Barbon))
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
+Teo Chip  (QQQ, Turtle 20/10)
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
+Dona Lena  (SPY, Turtle 20/10)
+  humor: normal
+  hoje: 0/10 vitórias, 0/5 derrotas, +0.00
+  capital: 10000.00 (pico 10000.00), lucro realizado +0.00
+  aprendizes liberados: 0 (1 a cada 100 de lucro)
+  posição: nenhuma
+
+Davi Dow  (DIA, Turtle 20/10)
   humor: normal
   hoje: 0/10 vitórias, 0/5 derrotas, +0.00
   capital: 10000.00 (pico 10000.00), lucro realizado +0.00
